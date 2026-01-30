@@ -6,6 +6,26 @@ A native macOS system monitor application built with SwiftUI. TopManager provide
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
 ![License](https://img.shields.io/badge/License-GPL--3.0-green)
 
+## Screenshots
+
+### Processes
+![Processes](Screenshots/processes.png)
+
+### Apps
+![Apps](Screenshots/apps.png)
+
+### Performance - CPU
+![CPU](Screenshots/performance-cpu.png)
+
+### Performance - Memory
+![Memory](Screenshots/performance-memory.png)
+
+### Performance - Network
+![Network](Screenshots/performance-network.png)
+
+### Power & Storage
+![Power & Storage](Screenshots/power-storage.png)
+
 ## Features
 
 ### Processes Tab
@@ -43,7 +63,7 @@ A native macOS system monitor application built with SwiftUI. TopManager provide
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/TopManager.git
+   git clone https://github.com/hariel1985/TopManager.git
    ```
 
 2. Open `TopManager.xcodeproj` in Xcode
