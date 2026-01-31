@@ -11,6 +11,7 @@ final class ProcessMonitor {
     private var userCache: [uid_t: String] = [:]
     private let timebaseInfo: mach_timebase_info_data_t
     private var refreshCounter = 0
+    private let processorCount = Double(ProcessInfo.processInfo.processorCount)
 
     init() {
         var info = mach_timebase_info_data_t()
@@ -111,11 +112,15 @@ final class ProcessMonitor {
 
         let icon = fetchIcon(pid: pid)
 
+        // Calculate normalized CPU (100% = all cores)
+        let cpuUsageTotal = cpuUsage / processorCount
+
         return ProcessItem(
             pid: pid,
             name: name,
             user: user,
             cpuUsage: cpuUsage,
+            cpuUsageTotal: cpuUsageTotal,
             memoryUsage: memoryUsage,
             threadCount: threadCount,
             state: state,
@@ -240,6 +245,7 @@ final class ProcessMonitor {
             name: name,
             user: user,
             cpuUsage: 0,
+            cpuUsageTotal: 0,
             memoryUsage: 0,
             threadCount: 0,
             state: state,

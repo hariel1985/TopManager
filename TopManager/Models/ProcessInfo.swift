@@ -6,7 +6,8 @@ struct ProcessItem: Identifiable, Hashable {
     let pid: pid_t
     let name: String
     let user: String
-    let cpuUsage: Double
+    let cpuUsage: Double        // Per-core: 100% = 1 core fully utilized
+    let cpuUsageTotal: Double   // Normalized: 100% = all cores fully utilized
     let memoryUsage: Int64
     let threadCount: Int32
     let state: ProcessState
@@ -21,6 +22,7 @@ struct ProcessItem: Identifiable, Hashable {
         name: String,
         user: String,
         cpuUsage: Double,
+        cpuUsageTotal: Double,
         memoryUsage: Int64,
         threadCount: Int32,
         state: ProcessState,
@@ -33,6 +35,7 @@ struct ProcessItem: Identifiable, Hashable {
         self.name = name
         self.user = user
         self.cpuUsage = cpuUsage
+        self.cpuUsageTotal = cpuUsageTotal
         self.memoryUsage = memoryUsage
         self.threadCount = threadCount
         self.state = state
@@ -48,6 +51,7 @@ struct ProcessItem: Identifiable, Hashable {
     static func == (lhs: ProcessItem, rhs: ProcessItem) -> Bool {
         lhs.pid == rhs.pid &&
         lhs.cpuUsage == rhs.cpuUsage &&
+        lhs.cpuUsageTotal == rhs.cpuUsageTotal &&
         lhs.memoryUsage == rhs.memoryUsage &&
         lhs.threadCount == rhs.threadCount &&
         lhs.state == rhs.state

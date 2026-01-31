@@ -100,6 +100,7 @@ struct DetailRow: View {
         name: "Safari",
         user: "ariel",
         cpuUsage: 12.5,
+        cpuUsageTotal: 1.56,
         memoryUsage: 512 * 1024 * 1024,
         threadCount: 42,
         state: .running,

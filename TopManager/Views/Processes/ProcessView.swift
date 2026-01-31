@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum ProcessSortColumn: String {
-    case name, pid, cpu, memory, threads, user, state
+    case name, pid, cpu, cpuTotal, memory, threads, user, state
 }
 
 struct ProcessView: View {
@@ -42,6 +42,8 @@ struct ProcessView: View {
                 comparison = lhs.pid < rhs.pid ? .orderedAscending : (lhs.pid > rhs.pid ? .orderedDescending : .orderedSame)
             case .cpu:
                 comparison = lhs.cpuUsage < rhs.cpuUsage ? .orderedAscending : (lhs.cpuUsage > rhs.cpuUsage ? .orderedDescending : .orderedSame)
+            case .cpuTotal:
+                comparison = lhs.cpuUsageTotal < rhs.cpuUsageTotal ? .orderedAscending : (lhs.cpuUsageTotal > rhs.cpuUsageTotal ? .orderedDescending : .orderedSame)
             case .memory:
                 comparison = lhs.memoryUsage < rhs.memoryUsage ? .orderedAscending : (lhs.memoryUsage > rhs.memoryUsage ? .orderedDescending : .orderedSame)
             case .threads:
@@ -100,10 +102,17 @@ struct ProcessView: View {
                 }
                 .width(60)
 
-                TableColumn("CPU %", value: \.cpuUsage) { process in
+                TableColumn("CPU/Core", value: \.cpuUsage) { process in
                     Text(String(format: "%.1f%%", process.cpuUsage))
                         .monospacedDigit()
                         .foregroundColor(cpuColor(process.cpuUsage))
+                }
+                .width(70)
+
+                TableColumn("CPU/Total", value: \.cpuUsageTotal) { process in
+                    Text(String(format: "%.2f%%", process.cpuUsageTotal))
+                        .monospacedDigit()
+                        .foregroundColor(cpuColorTotal(process.cpuUsageTotal))
                 }
                 .width(70)
 
@@ -186,7 +195,9 @@ struct ProcessView: View {
             // Use string representation of keypath to determine column
             let keyPathString = String(describing: comparator)
 
-            if keyPathString.contains("cpuUsage") {
+            if keyPathString.contains("cpuUsageTotal") {
+                sortColumn = .cpuTotal
+            } else if keyPathString.contains("cpuUsage") {
                 sortColumn = .cpu
             } else if keyPathString.contains("memoryUsage") {
                 sortColumn = .memory
@@ -269,6 +280,17 @@ struct ProcessView: View {
         } else if usage > 50 {
             return .orange
         } else if usage > 20 {
+            return .yellow
+        }
+        return .primary
+    }
+
+    private func cpuColorTotal(_ usage: Double) -> Color {
+        if usage > 10 {
+            return .red
+        } else if usage > 5 {
+            return .orange
+        } else if usage > 2 {
             return .yellow
         }
         return .primary
