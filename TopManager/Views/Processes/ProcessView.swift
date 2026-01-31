@@ -22,14 +22,20 @@ struct ProcessView: View {
     @State private var showForceKillConfirm = false
     @State private var processToKill: ProcessItem?
 
-    // "Don't ask again" preferences
+    // "Don't ask again" preference (only for Terminate, not Force Kill)
     @AppStorage("skipTerminateConfirm") private var skipTerminateConfirm = false
-    @AppStorage("skipForceKillConfirm") private var skipForceKillConfirm = false
 
     // Error handling
     @State private var showErrorAlert = false
     @State private var errorTitle = ""
     @State private var errorMessage = ""
+
+    // Protected system processes that cannot be force-killed via UI
+    private static let protectedProcesses = ["kernel_task", "launchd", "WindowServer", "loginwindow"]
+
+    private func isProtectedProcess(_ name: String) -> Bool {
+        Self.protectedProcesses.contains(name)
+    }
 
     private func updateDisplayedProcesses() {
         let filtered = monitor.processes.filter {
@@ -248,7 +254,8 @@ struct ProcessView: View {
                     message: "Are you sure you want to force kill \"\(process.name)\" (PID: \(process.pid))?\n\nThis will immediately terminate the process without allowing it to save data.",
                     actionTitle: "Force Kill",
                     isDestructive: true,
-                    skipPreferenceKey: "skipForceKillConfirm",
+                    // SAFETY: Force Kill always requires confirmation - no "Don't ask again" option
+                    skipPreferenceKey: nil,
                     onConfirm: {
                         performForceKill(process: process)
                     },
@@ -276,13 +283,18 @@ struct ProcessView: View {
 
     private func initiateForceKill() {
         guard let process = selectedProcessItem else { return }
-        processToKill = process
 
-        if skipForceKillConfirm {
-            performForceKill(process: process)
-        } else {
-            showForceKillConfirm = true
+        // SAFETY: Prevent force-killing critical system processes
+        if isProtectedProcess(process.name) {
+            errorTitle = "Cannot Force Kill System Process"
+            errorMessage = "\"\(process.name)\" is a critical system process.\n\nForce killing this process would crash your system or cause immediate logout."
+            showErrorAlert = true
+            return
         }
+
+        processToKill = process
+        // SAFETY: Force Kill always requires confirmation - no "Don't ask again" option
+        showForceKillConfirm = true
     }
 
     private func performTerminate(process: ProcessItem) {
@@ -354,7 +366,7 @@ struct ConfirmationSheet: View {
     let message: String
     let actionTitle: String
     let isDestructive: Bool
-    let skipPreferenceKey: String
+    let skipPreferenceKey: String?  // nil = don't show "Don't ask again" option
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
@@ -367,7 +379,7 @@ struct ConfirmationSheet: View {
         message: String,
         actionTitle: String,
         isDestructive: Bool,
-        skipPreferenceKey: String,
+        skipPreferenceKey: String? = nil,
         onConfirm: @escaping () -> Void,
         onCancel: @escaping () -> Void
     ) {
@@ -378,7 +390,8 @@ struct ConfirmationSheet: View {
         self.skipPreferenceKey = skipPreferenceKey
         self.onConfirm = onConfirm
         self.onCancel = onCancel
-        self._skipConfirm = AppStorage(wrappedValue: false, skipPreferenceKey)
+        // Use a dummy key if skipPreferenceKey is nil (won't be used anyway)
+        self._skipConfirm = AppStorage(wrappedValue: false, skipPreferenceKey ?? "_unused_")
     }
 
     var body: some View {
@@ -396,8 +409,11 @@ struct ConfirmationSheet: View {
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Toggle("Don't ask again", isOn: $dontAskAgain)
-                .toggleStyle(.checkbox)
+            // Only show "Don't ask again" if a preference key is provided
+            if skipPreferenceKey != nil {
+                Toggle("Don't ask again", isOn: $dontAskAgain)
+                    .toggleStyle(.checkbox)
+            }
 
             HStack(spacing: 12) {
                 Button("Cancel") {
@@ -407,7 +423,7 @@ struct ConfirmationSheet: View {
                 .keyboardShortcut(.cancelAction)
 
                 Button(actionTitle) {
-                    if dontAskAgain {
+                    if dontAskAgain && skipPreferenceKey != nil {
                         skipConfirm = true
                     }
                     onConfirm()
