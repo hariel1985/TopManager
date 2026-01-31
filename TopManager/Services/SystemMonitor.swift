@@ -1,24 +1,25 @@
 import Foundation
 import Combine
 
-@MainActor
 final class SystemMonitor: ObservableObject {
-    static let shared = SystemMonitor()
+    @MainActor static let shared = SystemMonitor()
 
-    // Published properties
-    @Published var cpuInfo: CPUInfo?
-    @Published var memoryInfo: MemoryInfo?
-    @Published var processes: [ProcessItem] = []
-    @Published var diskInfo: DiskInfo?
-    @Published var networkInfo: NetworkInfo?
-    @Published var gpuInfo: GPUInfo?
-    @Published var lastError: String?
+    private let backgroundQueue = DispatchQueue(label: "com.topmanager.monitor", qos: .userInitiated)
+
+    // Published properties (must be updated on main thread)
+    @MainActor @Published var cpuInfo: CPUInfo?
+    @MainActor @Published var memoryInfo: MemoryInfo?
+    @MainActor @Published var processes: [ProcessItem] = []
+    @MainActor @Published var diskInfo: DiskInfo?
+    @MainActor @Published var networkInfo: NetworkInfo?
+    @MainActor @Published var gpuInfo: GPUInfo?
+    @MainActor @Published var lastError: String?
 
     // History for charts
-    @Published var cpuHistory: [CPUHistoryPoint] = []
-    @Published var coreHistories: [Int: [CoreHistoryPoint]] = [:]
-    @Published var memoryHistory: [MemoryHistoryPoint] = []
-    @Published var networkHistory: [NetworkHistoryPoint] = []
+    @MainActor @Published var cpuHistory: [CPUHistoryPoint] = []
+    @MainActor @Published var coreHistories: [Int: [CoreHistoryPoint]] = [:]
+    @MainActor @Published var memoryHistory: [MemoryHistoryPoint] = []
+    @MainActor @Published var networkHistory: [NetworkHistoryPoint] = []
 
     // Sub-monitors
     private let cpuMonitor = CPUMonitor()
@@ -37,57 +38,85 @@ final class SystemMonitor: ObservableObject {
         cpuMonitor.isAppleSilicon
     }
 
-    var thermalState: ProcessInfo.ThermalState {
+    @MainActor var thermalState: ProcessInfo.ThermalState {
         ProcessInfo.processInfo.thermalState
     }
 
     private init() {}
 
-    func startMonitoring() {
-        // Initial fetch
-        Task {
-            await refreshAll()
+    @MainActor func startMonitoring() {
+        // Immediate initial fetch
+        backgroundQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // Prime both CPU and process monitors (first call sets baseline for delta calculation)
+            _ = self.cpuMonitor.fetchCPUInfo()
+            _ = self.processMonitor.fetchProcesses()
+
+            // Delay for meaningful delta calculation (1 second minimum for accurate CPU %)
+            Thread.sleep(forTimeInterval: 1.0)
+
+            // Now fetch with valid deltas
+            let cpuData = self.cpuMonitor.fetchCPUInfo()
+            let memData = self.memoryMonitor.fetchMemoryInfo()
+            let netData = self.networkMonitor.fetchNetworkInfo()
+            let processData = self.processMonitor.fetchProcesses()
+            let diskData = self.diskMonitor.fetchDiskInfo()
+            let gpuData = self.gpuMonitor.fetchGPUInfo()
+
+            DispatchQueue.main.async {
+                self.updateUI(cpu: cpuData, memory: memData, network: netData,
+                             processes: processData, disk: diskData, gpu: gpuData)
+            }
         }
 
-        // Start periodic refresh (2 second interval to reduce CPU usage)
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                await self?.refreshAll()
+        // Start periodic refresh (3 second interval)
+        timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+            self?.backgroundQueue.async {
+                self?.refreshAllBackground()
             }
         }
     }
 
-    func stopMonitoring() {
+    @MainActor func stopMonitoring() {
         timer?.invalidate()
         timer = nil
     }
 
-    private func refreshAll() async {
+    private func refreshAllBackground() {
         refreshCount += 1
+        let currentCount = refreshCount
 
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.refreshCPU() }
-            group.addTask { await self.refreshMemory() }
-            group.addTask { await self.refreshNetwork() }
+        // Fetch data on background thread
+        let cpuData = cpuMonitor.fetchCPUInfo()
+        let memData = memoryMonitor.fetchMemoryInfo()
+        let netData = networkMonitor.fetchNetworkInfo()
 
-            // Refresh processes every other cycle = 4 seconds (expensive operation)
-            if self.refreshCount % 2 == 0 {
-                group.addTask { await self.refreshProcesses() }
-            }
+        // Fetch processes: first 3 cycles always, then every other cycle
+        var processData: [ProcessItem]? = nil
+        if currentCount <= 3 || currentCount % 2 == 0 {
+            processData = processMonitor.fetchProcesses()
+        }
 
-            // Refresh disk and GPU every 3 cycles = 6 seconds (less volatile)
-            if self.refreshCount % 3 == 0 {
-                group.addTask { await self.refreshDisk() }
-                group.addTask { await self.refreshGPU() }
-            }
+        // Fetch disk and GPU every 3 cycles
+        var diskData: DiskInfo? = nil
+        var gpuData: GPUInfo? = nil
+        if currentCount % 3 == 0 {
+            diskData = diskMonitor.fetchDiskInfo()
+            gpuData = gpuMonitor.fetchGPUInfo()
+        }
+
+        // Update UI on main thread
+        DispatchQueue.main.async { [weak self] in
+            self?.updateUI(cpu: cpuData, memory: memData, network: netData,
+                          processes: processData, disk: diskData, gpu: gpuData)
         }
     }
 
-    private func refreshCPU() async {
-        if let info = cpuMonitor.fetchCPUInfo() {
+    @MainActor private func updateUI(cpu: CPUInfo?, memory: MemoryInfo?, network: NetworkInfo?,
+                                      processes: [ProcessItem]?, disk: DiskInfo?, gpu: GPUInfo?) {
+        if let info = cpu {
             cpuInfo = info
-
-            // Global CPU history
             let historyPoint = CPUHistoryPoint(
                 timestamp: info.timestamp,
                 usage: info.globalUsage,
@@ -99,12 +128,8 @@ final class SystemMonitor: ObservableObject {
                 cpuHistory.removeFirst()
             }
 
-            // Per-core history
             for core in info.coreUsages {
-                let corePoint = CoreHistoryPoint(
-                    timestamp: info.timestamp,
-                    usage: core.usage
-                )
+                let corePoint = CoreHistoryPoint(timestamp: info.timestamp, usage: core.usage)
                 if coreHistories[core.id] == nil {
                     coreHistories[core.id] = []
                 }
@@ -114,12 +139,9 @@ final class SystemMonitor: ObservableObject {
                 }
             }
         }
-    }
 
-    private func refreshMemory() async {
-        if let info = memoryMonitor.fetchMemoryInfo() {
+        if let info = memory {
             memoryInfo = info
-
             let historyPoint = MemoryHistoryPoint(
                 timestamp: info.timestamp,
                 usedMemory: info.usedMemory,
@@ -130,20 +152,9 @@ final class SystemMonitor: ObservableObject {
                 memoryHistory.removeFirst()
             }
         }
-    }
 
-    private func refreshProcesses() async {
-        processes = processMonitor.fetchProcesses()
-    }
-
-    private func refreshDisk() async {
-        diskInfo = diskMonitor.fetchDiskInfo()
-    }
-
-    private func refreshNetwork() async {
-        if let info = networkMonitor.fetchNetworkInfo() as NetworkInfo? {
+        if let info = network {
             networkInfo = info
-
             let historyPoint = NetworkHistoryPoint(
                 timestamp: info.timestamp,
                 downloadRate: info.totalDownloadRate,
@@ -154,10 +165,18 @@ final class SystemMonitor: ObservableObject {
                 networkHistory.removeFirst()
             }
         }
-    }
 
-    private func refreshGPU() async {
-        gpuInfo = gpuMonitor.fetchGPUInfo()
+        if let procs = processes {
+            self.processes = procs
+        }
+
+        if let info = disk {
+            diskInfo = info
+        }
+
+        if let info = gpu {
+            gpuInfo = info
+        }
     }
 
     // Process control methods

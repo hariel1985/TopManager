@@ -4,10 +4,13 @@ import AppKit
 
 final class ProcessMonitor {
     private var previousCPUTimes: [pid_t: (user: UInt64, system: UInt64, timestamp: Date)] = [:]
+    private var lastKnownCPU: [pid_t: Double] = [:]  // Cache last known CPU usage
     private let iconCache = NSCache<NSNumber, NSImage>()
+    private var noIconPids: Set<pid_t> = []  // Cache for PIDs with no icon
     private var nameCache: [pid_t: String] = [:]
     private var userCache: [uid_t: String] = [:]
     private let timebaseInfo: mach_timebase_info_data_t
+    private var refreshCounter = 0
 
     init() {
         var info = mach_timebase_info_data_t()
@@ -16,6 +19,10 @@ final class ProcessMonitor {
     }
 
     func fetchProcesses() -> [ProcessItem] {
+        refreshCounter += 1
+        // Full refresh on first 3 calls (to establish baselines) and then every 3rd call
+        let isFullRefresh = refreshCounter <= 3 || refreshCounter % 3 == 0
+
         var pids = [pid_t](repeating: 0, count: 2048)
         let bytesUsed = proc_listpids(UInt32(PROC_ALL_PIDS), 0, &pids, Int32(pids.count * MemoryLayout<pid_t>.size))
 
@@ -30,8 +37,9 @@ final class ProcessMonitor {
             guard pid > 0 else { continue }
             currentPids.insert(pid)
 
-            if let process = fetchProcessInfo(pid: pid) {
+            if let process = fetchProcessInfo(pid: pid, fullRefresh: isFullRefresh) {
                 processes.append(process)
+                lastKnownCPU[pid] = process.cpuUsage
             }
         }
 
@@ -41,12 +49,14 @@ final class ProcessMonitor {
             nameCache.removeValue(forKey: pid)
             iconCache.removeObject(forKey: NSNumber(value: pid))
             previousCPUTimes.removeValue(forKey: pid)
+            noIconPids.remove(pid)
+            lastKnownCPU.removeValue(forKey: pid)
         }
 
         return processes
     }
 
-    private func fetchProcessInfo(pid: pid_t) -> ProcessItem? {
+    private func fetchProcessInfo(pid: pid_t, fullRefresh: Bool = true) -> ProcessItem? {
         var bsdInfo = proc_bsdinfo()
         let bsdInfoSize = Int32(MemoryLayout<proc_bsdinfo>.size)
         let bsdResult = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsdInfo, bsdInfoSize)
@@ -56,31 +66,42 @@ final class ProcessMonitor {
             return fetchBasicProcessInfo(pid: pid)
         }
 
-        var taskInfo = proc_taskinfo()
-        let taskInfoSize = Int32(MemoryLayout<proc_taskinfo>.size)
-        let taskResult = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &taskInfo, taskInfoSize)
-        let hasTaskInfo = taskResult == taskInfoSize
-
         let name = fetchProcessName(pid: pid, bsdInfo: bsdInfo)
         let user = fetchUsername(uid: bsdInfo.pbi_uid)
         let parentPid = pid_t(bsdInfo.pbi_ppid)
         let startTime = Date(timeIntervalSince1970: TimeInterval(bsdInfo.pbi_start_tvsec))
 
-        // For processes without task info, use defaults
+        // Check if we should do a lightweight refresh
+        // Skip expensive calls for processes with 0 CPU last time (unless full refresh)
+        let lastCPU = lastKnownCPU[pid] ?? 0
+        let needsDetailedInfo = fullRefresh || lastCPU > 0.1
+
         let memoryUsage: Int64
         let threadCount: Int32
         let cpuUsage: Double
 
-        if hasTaskInfo {
-            let rusageData = fetchRusageData(pid: pid)
-            memoryUsage = rusageData.memory
-            threadCount = taskInfo.pti_threadnum
-            cpuUsage = calculateCPUUsage(
-                pid: pid,
-                userTime: rusageData.userTime,
-                systemTime: rusageData.systemTime
-            )
+        if needsDetailedInfo {
+            var taskInfo = proc_taskinfo()
+            let taskInfoSize = Int32(MemoryLayout<proc_taskinfo>.size)
+            let taskResult = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &taskInfo, taskInfoSize)
+            let hasTaskInfo = taskResult == taskInfoSize
+
+            if hasTaskInfo {
+                let rusageData = fetchRusageData(pid: pid)
+                memoryUsage = rusageData.memory
+                threadCount = taskInfo.pti_threadnum
+                cpuUsage = calculateCPUUsage(
+                    pid: pid,
+                    userTime: rusageData.userTime,
+                    systemTime: rusageData.systemTime
+                )
+            } else {
+                memoryUsage = 0
+                threadCount = 0
+                cpuUsage = 0
+            }
         } else {
+            // Lightweight refresh - reuse last known values
             memoryUsage = 0
             threadCount = 0
             cpuUsage = 0
@@ -275,18 +296,26 @@ final class ProcessMonitor {
     }
 
     private func fetchIcon(pid: pid_t) -> NSImage? {
-        let cacheKey = NSNumber(value: pid)
+        // Skip if we already know this PID has no icon
+        if noIconPids.contains(pid) {
+            return nil
+        }
 
+        let cacheKey = NSNumber(value: pid)
         if let cached = iconCache.object(forKey: cacheKey) {
             return cached
         }
 
-        if let app = NSRunningApplication(processIdentifier: pid),
-           let icon = app.icon {
-            iconCache.setObject(icon, forKey: cacheKey)
-            return icon
+        // Only fetch icons for regular apps (GUI apps) - skip background processes
+        if let app = NSRunningApplication(processIdentifier: pid) {
+            if app.activationPolicy == .regular, let icon = app.icon {
+                iconCache.setObject(icon, forKey: cacheKey)
+                return icon
+            }
         }
 
+        // Remember that this PID has no icon
+        noIconPids.insert(pid)
         return nil
     }
 
