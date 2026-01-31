@@ -136,21 +136,51 @@ final class ProcessMonitor {
             return cached
         }
 
-        // PROC_PIDPATHINFO_MAXSIZE is 4 * MAXPATHLEN = 4096
-        var pathBuffer = [CChar](repeating: 0, count: 4096)
-        let pathLength = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
+        // DEFENSIVE: Use explicit constant instead of magic number
+        // PROC_PIDPATHINFO_MAXSIZE = 4 * MAXPATHLEN = 4 * 1024 = 4096
+        let maxPathSize = 4096
+        var pathBuffer = [CChar](repeating: 0, count: maxPathSize)
+
+        // proc_pidpath returns length WITHOUT null terminator, or 0 on error
+        let pathLength = Int(proc_pidpath(pid, &pathBuffer, UInt32(maxPathSize)))
 
         let name: String
-        if pathLength > 0 {
-            let path = String(cString: pathBuffer)
-            name = (path as NSString).lastPathComponent
+        if pathLength > 0 && pathLength < maxPathSize {
+            // DEFENSIVE: Create string from explicit length, don't rely on null terminator
+            // This protects against edge cases where buffer might not be null-terminated
+            let pathData = Data(bytes: pathBuffer, count: pathLength)
+            if let path = String(data: pathData, encoding: .utf8) {
+                name = (path as NSString).lastPathComponent
+            } else {
+                name = "Process \(pid)"
+            }
         } else {
-            let bsdName = withUnsafePointer(to: bsdInfo.pbi_name) { ptr -> String in
-                ptr.withMemoryRebound(to: CChar.self, capacity: Int(MAXCOMLEN)) {
-                    String(cString: $0)
+            // DEFENSIVE: Safe BSD name extraction with guaranteed null termination
+            // Don't trust that pbi_name is null-terminated within MAXCOMLEN bounds
+            var bsdNameBytes = bsdInfo.pbi_name
+
+            let bsdName = withUnsafeBytes(of: &bsdNameBytes) { rawPtr -> String in
+                let maxLen = Int(MAXCOMLEN)
+                // Create a safe buffer with guaranteed null terminator at end
+                var safeBuffer = [UInt8](repeating: 0, count: maxLen + 1)
+
+                // Copy only up to maxLen bytes, leaving the last byte as null
+                let bytesToCopy = min(rawPtr.count, maxLen)
+                for i in 0..<bytesToCopy {
+                    safeBuffer[i] = rawPtr[i]
+                }
+
+                // Now safe to use String(cString:) - buffer is guaranteed null-terminated
+                return safeBuffer.withUnsafeBufferPointer { bufPtr in
+                    bufPtr.baseAddress!.withMemoryRebound(to: CChar.self, capacity: safeBuffer.count) {
+                        String(cString: $0)
+                    }
                 }
             }
-            name = bsdName.isEmpty ? "(Unknown)" : bsdName
+
+            // DEFENSIVE: Clean control characters and whitespace that could be injected
+            let cleanedName = bsdName.trimmingCharacters(in: .controlCharacters.union(.whitespaces))
+            name = cleanedName.isEmpty ? "Process \(pid)" : cleanedName
         }
 
         nameCache[pid] = name
@@ -211,17 +241,31 @@ final class ProcessMonitor {
         let result = sysctl(&mib, UInt32(mib.count), &info, &size, nil, 0)
         guard result == 0, size > 0 else { return nil }
 
-        // Extract name from kp_proc.p_comm
-        var name = withUnsafePointer(to: info.kp_proc.p_comm) { ptr -> String in
-            ptr.withMemoryRebound(to: CChar.self, capacity: 16) {
-                String(cString: $0)
+        // DEFENSIVE: Extract name from kp_proc.p_comm with guaranteed null termination
+        // p_comm is MAXCOMLEN (16) bytes, may not be null-terminated if name is exactly 16 chars
+        var pCommBytes = info.kp_proc.p_comm
+
+        var name = withUnsafeBytes(of: &pCommBytes) { rawPtr -> String in
+            let maxLen = 16 // MAXCOMLEN for p_comm
+            var safeBuffer = [UInt8](repeating: 0, count: maxLen + 1)
+
+            let bytesToCopy = min(rawPtr.count, maxLen)
+            for i in 0..<bytesToCopy {
+                safeBuffer[i] = rawPtr[i]
+            }
+
+            return safeBuffer.withUnsafeBufferPointer { bufPtr in
+                bufPtr.baseAddress!.withMemoryRebound(to: CChar.self, capacity: safeBuffer.count) {
+                    String(cString: $0)
+                }
             }
         }
-        if name.isEmpty {
-            name = "(Unknown)"
-        }
 
-        // Check cache for full name
+        // DEFENSIVE: Clean control characters
+        let cleanedName = name.trimmingCharacters(in: .controlCharacters.union(.whitespaces))
+        name = cleanedName.isEmpty ? "Process \(pid)" : cleanedName
+
+        // Check cache for full name (path-based name is more accurate)
         if let cachedName = nameCache[pid] {
             name = cachedName
         } else {
