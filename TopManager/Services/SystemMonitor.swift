@@ -179,24 +179,128 @@ final class SystemMonitor: ObservableObject {
         }
     }
 
-    // Process control methods
-    @discardableResult
-    func terminateProcess(_ pid: pid_t) -> Bool {
-        kill(pid, SIGTERM) == 0
+    // Process control methods with PID validation
+
+    /// Validates that a PID still refers to the same process before sending a signal
+    private func validateProcess(pid: pid_t, expectedStartTime: Date?) -> ProcessControlError? {
+        var bsdInfo = proc_bsdinfo()
+        let bsdInfoSize = Int32(MemoryLayout<proc_bsdinfo>.size)
+        let result = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &bsdInfo, bsdInfoSize)
+
+        // Check if process still exists
+        guard result == bsdInfoSize else {
+            return .processNotFound
+        }
+
+        // Validate start time matches (detects PID reuse)
+        if let expected = expectedStartTime {
+            let currentStartTime = Date(timeIntervalSince1970: TimeInterval(bsdInfo.pbi_start_tvsec))
+            // Allow 1 second tolerance for timing differences
+            if abs(currentStartTime.timeIntervalSince(expected)) > 1.0 {
+                return .processChanged
+            }
+        }
+
+        return nil // Validation passed
     }
 
-    @discardableResult
-    func forceKillProcess(_ pid: pid_t) -> Bool {
-        kill(pid, SIGKILL) == 0
+    func terminateProcess(_ pid: pid_t, expectedStartTime: Date? = nil) -> Result<Void, ProcessControlError> {
+        // Validate PID still refers to same process
+        if let error = validateProcess(pid: pid, expectedStartTime: expectedStartTime) {
+            return .failure(error)
+        }
+
+        let result = kill(pid, SIGTERM)
+        if result == 0 {
+            return .success(())
+        } else {
+            return .failure(ProcessControlError.fromErrno(errno))
+        }
     }
 
-    @discardableResult
-    func suspendProcess(_ pid: pid_t) -> Bool {
-        kill(pid, SIGSTOP) == 0
+    func forceKillProcess(_ pid: pid_t, expectedStartTime: Date? = nil) -> Result<Void, ProcessControlError> {
+        // Validate PID still refers to same process
+        if let error = validateProcess(pid: pid, expectedStartTime: expectedStartTime) {
+            return .failure(error)
+        }
+
+        let result = kill(pid, SIGKILL)
+        if result == 0 {
+            return .success(())
+        } else {
+            return .failure(ProcessControlError.fromErrno(errno))
+        }
     }
 
-    @discardableResult
-    func resumeProcess(_ pid: pid_t) -> Bool {
-        kill(pid, SIGCONT) == 0
+    func suspendProcess(_ pid: pid_t, expectedStartTime: Date? = nil) -> Result<Void, ProcessControlError> {
+        if let error = validateProcess(pid: pid, expectedStartTime: expectedStartTime) {
+            return .failure(error)
+        }
+
+        let result = kill(pid, SIGSTOP)
+        if result == 0 {
+            return .success(())
+        } else {
+            return .failure(ProcessControlError.fromErrno(errno))
+        }
+    }
+
+    func resumeProcess(_ pid: pid_t, expectedStartTime: Date? = nil) -> Result<Void, ProcessControlError> {
+        if let error = validateProcess(pid: pid, expectedStartTime: expectedStartTime) {
+            return .failure(error)
+        }
+
+        let result = kill(pid, SIGCONT)
+        if result == 0 {
+            return .success(())
+        } else {
+            return .failure(ProcessControlError.fromErrno(errno))
+        }
+    }
+}
+
+// MARK: - Process Control Errors
+
+enum ProcessControlError: Error, LocalizedError {
+    case processNotFound
+    case processChanged
+    case permissionDenied
+    case unknownError(Int32)
+
+    var errorDescription: String? {
+        switch self {
+        case .processNotFound:
+            return "Process no longer exists"
+        case .processChanged:
+            return "Process has changed (PID was reused by another process)"
+        case .permissionDenied:
+            return "Permission denied"
+        case .unknownError(let code):
+            return "Operation failed (error code: \(code))"
+        }
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .processNotFound:
+            return "The process may have exited on its own."
+        case .processChanged:
+            return "Please refresh the process list and try again."
+        case .permissionDenied:
+            return "You don't have permission to control this process. It may be owned by another user or the system."
+        case .unknownError:
+            return "Please try again or check system logs."
+        }
+    }
+
+    static func fromErrno(_ errno: Int32) -> ProcessControlError {
+        switch errno {
+        case ESRCH:
+            return .processNotFound
+        case EPERM:
+            return .permissionDenied
+        default:
+            return .unknownError(errno)
+        }
     }
 }

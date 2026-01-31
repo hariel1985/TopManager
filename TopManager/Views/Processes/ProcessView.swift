@@ -26,6 +26,11 @@ struct ProcessView: View {
     @AppStorage("skipTerminateConfirm") private var skipTerminateConfirm = false
     @AppStorage("skipForceKillConfirm") private var skipForceKillConfirm = false
 
+    // Error handling
+    @State private var showErrorAlert = false
+    @State private var errorTitle = ""
+    @State private var errorMessage = ""
+
     private func updateDisplayedProcesses() {
         let filtered = monitor.processes.filter {
             searchText.isEmpty ||
@@ -144,7 +149,8 @@ struct ProcessView: View {
                 .width(90)
             }
             .contextMenu(forSelectionType: ProcessItem.ID.self) { selection in
-                if let pid = selection.first {
+                if let pid = selection.first,
+                   let process = monitor.processes.first(where: { $0.pid == pid }) {
                     Button("Terminate (⌫)") {
                         initiateTerminate()
                     }
@@ -153,10 +159,10 @@ struct ProcessView: View {
                     }
                     Divider()
                     Button("Suspend") {
-                        monitor.suspendProcess(pid)
+                        performSuspend(process: process)
                     }
                     Button("Resume") {
-                        monitor.resumeProcess(pid)
+                        performResume(process: process)
                     }
                     Divider()
                     Button("Copy PID") {
@@ -229,7 +235,7 @@ struct ProcessView: View {
                     isDestructive: true,
                     skipPreferenceKey: "skipTerminateConfirm",
                     onConfirm: {
-                        monitor.terminateProcess(process.pid)
+                        performTerminate(process: process)
                     },
                     onCancel: {}
                 )
@@ -244,11 +250,16 @@ struct ProcessView: View {
                     isDestructive: true,
                     skipPreferenceKey: "skipForceKillConfirm",
                     onConfirm: {
-                        monitor.forceKillProcess(process.pid)
+                        performForceKill(process: process)
                     },
                     onCancel: {}
                 )
             }
+        }
+        .alert(errorTitle, isPresented: $showErrorAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage)
         }
     }
 
@@ -257,7 +268,7 @@ struct ProcessView: View {
         processToKill = process
 
         if skipTerminateConfirm {
-            monitor.terminateProcess(process.pid)
+            performTerminate(process: process)
         } else {
             showTerminateConfirm = true
         }
@@ -268,9 +279,40 @@ struct ProcessView: View {
         processToKill = process
 
         if skipForceKillConfirm {
-            monitor.forceKillProcess(process.pid)
+            performForceKill(process: process)
         } else {
             showForceKillConfirm = true
+        }
+    }
+
+    private func performTerminate(process: ProcessItem) {
+        let result = monitor.terminateProcess(process.pid, expectedStartTime: process.startTime)
+        handleProcessControlResult(result, action: "terminate", processName: process.name)
+    }
+
+    private func performForceKill(process: ProcessItem) {
+        let result = monitor.forceKillProcess(process.pid, expectedStartTime: process.startTime)
+        handleProcessControlResult(result, action: "force kill", processName: process.name)
+    }
+
+    private func performSuspend(process: ProcessItem) {
+        let result = monitor.suspendProcess(process.pid, expectedStartTime: process.startTime)
+        handleProcessControlResult(result, action: "suspend", processName: process.name)
+    }
+
+    private func performResume(process: ProcessItem) {
+        let result = monitor.resumeProcess(process.pid, expectedStartTime: process.startTime)
+        handleProcessControlResult(result, action: "resume", processName: process.name)
+    }
+
+    private func handleProcessControlResult(_ result: Result<Void, ProcessControlError>, action: String, processName: String) {
+        switch result {
+        case .success:
+            break // Success - no action needed
+        case .failure(let error):
+            errorTitle = "Unable to \(action) \"\(processName)\""
+            errorMessage = "\(error.errorDescription ?? "Unknown error")\n\n\(error.recoverySuggestion ?? "")"
+            showErrorAlert = true
         }
     }
 
