@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		00EC5A90B7B8C6C5015D90D1 /* PerformanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F80A817DCDA254349DEA6F06 /* PerformanceView.swift */; };
-		2B3C4D5E6F7A8B9C0D1E2F3A /* AppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F7A8B9C0D1E2F /* AppsView.swift */; };
 		0AA7D351AEB05078FA9B4B93 /* ProcessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B6F97E6EF65AA17A469F037 /* ProcessView.swift */; };
 		136DAD1FE90FD682DF666667 /* TopManager_icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 8E4A6E8E2305CEDC119AC6BC /* TopManager_icon.png */; };
 		1F212CE158B7D14B29077B18 /* CPUInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44281079654C7E1C9E16806C /* CPUInfo.swift */; };
@@ -24,6 +23,7 @@
 		8F9ED99AB6D8D90AE79B5179 /* DiskUsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B3F62455B01B2E9C0D76A9 /* DiskUsageView.swift */; };
 		9146403BC02D18A234444DF6 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 295232B4C746511757DCF8FE /* ProcessMonitor.swift */; };
 		A0649565A902BA48DB10F592 /* CPUMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19ED582C412C63A0A2E2103E /* CPUMonitor.swift */; };
+		A7EC9FB55D5088D669491C11 /* AppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813543165B39EBD213EB3BC7 /* AppsView.swift */; };
 		B62B18DF32A8734D5908B16B /* DiskInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352CA1BE2A3B43643A9DBD72 /* DiskInfo.swift */; };
 		C077A279E20A90FD6038CCB0 /* ProcessDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110A314A63AE355A9E04990D /* ProcessDetailView.swift */; };
 		CB7F422FBF9F6D152FC4F41B /* NetworkChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFADE83965AA863B775A910 /* NetworkChartView.swift */; };
@@ -40,7 +40,6 @@
 
 /* Begin PBXFileReference section */
 		110A314A63AE355A9E04990D /* ProcessDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDetailView.swift; sourceTree = "<group>"; };
-		1A2B3C4D5E6F7A8B9C0D1E2F /* AppsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppsView.swift; sourceTree = "<group>"; };
 		162FC58F6C44EC1DD7022A86 /* DiskMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskMonitor.swift; sourceTree = "<group>"; };
 		19ED582C412C63A0A2E2103E /* CPUMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUMonitor.swift; sourceTree = "<group>"; };
 		279B972C08A878053821285D /* SystemMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemMonitor.swift; sourceTree = "<group>"; };
@@ -57,6 +56,7 @@
 		7326AE4B2D75476BDCFE3FFB /* MemoryLineChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryLineChart.swift; sourceTree = "<group>"; };
 		78C9B469F6A45F3CC21A7594 /* ByteFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ByteFormatters.swift; sourceTree = "<group>"; };
 		7B6F97E6EF65AA17A469F037 /* ProcessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessView.swift; sourceTree = "<group>"; };
+		813543165B39EBD213EB3BC7 /* AppsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppsView.swift; sourceTree = "<group>"; };
 		8E4A6E8E2305CEDC119AC6BC /* TopManager_icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = TopManager_icon.png; sourceTree = "<group>"; };
 		8F402CE13EF67DE550786B79 /* MemoryDonutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryDonutView.swift; sourceTree = "<group>"; };
 		94D5A13CC5B9CF1B90CC2214 /* CPUChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUChartView.swift; sourceTree = "<group>"; };
@@ -74,14 +74,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
-		3C4D5E6F7A8B9C0D1E2F3A4B /* Apps */ = {
-			isa = PBXGroup;
-			children = (
-				1A2B3C4D5E6F7A8B9C0D1E2F /* AppsView.swift */,
-			);
-			path = Apps;
-			sourceTree = "<group>";
-		};
 		06D63CC4D5468CEC1E31137A /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -153,6 +145,14 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		6901D0C7B3DA57547BCFAAFC /* Apps */ = {
+			isa = PBXGroup;
+			children = (
+				813543165B39EBD213EB3BC7 /* AppsView.swift */,
+			);
+			path = Apps;
+			sourceTree = "<group>";
+		};
 		9C38088C52BDE6A2BA1CEF73 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
@@ -166,7 +166,7 @@
 			children = (
 				C4F1ACD0492CAB741595DEAA /* ContentView.swift */,
 				9D71CC63FC2FEF52A069372E /* MenuBarView.swift */,
-				3C4D5E6F7A8B9C0D1E2F3A4B /* Apps */,
+				6901D0C7B3DA57547BCFAAFC /* Apps */,
 				4935484C55FD4C912A30D623 /* Performance */,
 				CC52DA4C64987575E4D96A00 /* PowerStorage */,
 				F2616FC0A232C728E792C2E8 /* Processes */,
@@ -231,7 +231,7 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					F86DD5615146D759EB0D44EB = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = P3663392R2;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -272,7 +272,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				2B3C4D5E6F7A8B9C0D1E2F3A /* AppsView.swift in Sources */,
+				A7EC9FB55D5088D669491C11 /* AppsView.swift in Sources */,
 				DE50ECC69FCE60B10364802C /* ByteFormatters.swift in Sources */,
 				FA252F9182ADDA26AD1E54DE /* CPUChartView.swift in Sources */,
 				1F212CE158B7D14B29077B18 /* CPUInfo.swift in Sources */,
@@ -360,7 +360,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = P3663392R2;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -445,7 +445,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = P3663392R2;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
