@@ -141,6 +141,11 @@ struct PowerStorageView: View {
                 }
                 .fixedSize(horizontal: false, vertical: true)
 
+                // Battery & Power
+                if let power = monitor.powerInfo {
+                    BatteryStatusView(power: power)
+                }
+
                 // Storage
                 GroupBox {
                     VStack(alignment: .leading, spacing: 12) {
@@ -180,6 +185,109 @@ struct PowerStorageView: View {
                 }
             }
             .padding()
+        }
+    }
+}
+
+struct BatteryStatusView: View {
+    let power: PowerInfo
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Label("Battery & Power", systemImage: batteryIcon)
+                        .font(.headline)
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Image(systemName: power.isPluggedIn ? "powerplug.fill" : "battery.100")
+                            .foregroundColor(.secondary)
+                        Text(power.powerSourceLabel)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                if power.hasBattery {
+                    HStack {
+                        Text("Charge:")
+                        Spacer()
+                        if power.isCharging {
+                            Image(systemName: "bolt.fill").foregroundColor(.yellow)
+                        }
+                        Text("\(power.currentCharge)%").monospacedDigit()
+                    }
+                    ProgressView(value: Double(power.currentCharge), total: 100)
+                        .tint(chargeColor)
+
+                    row("Condition") {
+                        Text(power.condition.rawValue)
+                            .foregroundColor(conditionColor)
+                    }
+
+                    if let health = power.healthPercent {
+                        row("Health (max/design)") {
+                            Text(String(format: "%.0f%%", health)).monospacedDigit()
+                        }
+                    }
+                    if let cycles = power.cycleCount {
+                        row("Cycle Count") { Text("\(cycles)").monospacedDigit() }
+                    }
+                    if let temp = power.temperature {
+                        row("Temperature") { Text(String(format: "%.1f °C", temp)).monospacedDigit() }
+                    }
+                    if let watts = power.powerWatts {
+                        row(power.isCharging ? "Charge Power" : "Power Draw") {
+                            Text(String(format: "%.1f W", abs(watts))).monospacedDigit()
+                        }
+                    }
+                    if let toEmpty = power.timeToEmpty {
+                        row("Time Remaining") { Text(BatteryMath.formatMinutes(toEmpty)).monospacedDigit() }
+                    }
+                    if let toFull = power.timeToFull {
+                        row("Time to Full") { Text(BatteryMath.formatMinutes(toFull)).monospacedDigit() }
+                    }
+                    if let adapter = power.adapterWatts, adapter > 0 {
+                        row("Power Adapter") { Text("\(adapter) W").monospacedDigit() }
+                    }
+                } else {
+                    Text("No battery detected — running on AC power.")
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func row<Content: View>(_ label: String, @ViewBuilder value: () -> Content) -> some View {
+        HStack {
+            Text(label + ":")
+            Spacer()
+            value()
+        }
+    }
+
+    private var batteryIcon: String {
+        if !power.hasBattery { return "powerplug" }
+        if power.isCharging { return "battery.100.bolt" }
+        switch power.currentCharge {
+        case ..<15: return "battery.25"
+        case ..<50: return "battery.50"
+        case ..<85: return "battery.75"
+        default: return "battery.100"
+        }
+    }
+
+    private var chargeColor: Color {
+        if power.currentCharge < 15 { return .red }
+        if power.currentCharge < 30 { return .orange }
+        return .green
+    }
+
+    private var conditionColor: Color {
+        switch power.condition {
+        case .normal: return .green
+        case .serviceRecommended: return .orange
+        case .unknown: return .secondary
         }
     }
 }

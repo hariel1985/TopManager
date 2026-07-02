@@ -13,6 +13,7 @@ final class SystemMonitor: ObservableObject {
     @MainActor @Published var diskInfo: DiskInfo?
     @MainActor @Published var networkInfo: NetworkInfo?
     @MainActor @Published var gpuInfo: GPUInfo?
+    @MainActor @Published var powerInfo: PowerInfo?
     @MainActor @Published var lastError: String?
 
     // History for charts
@@ -28,6 +29,7 @@ final class SystemMonitor: ObservableObject {
     private let diskMonitor = DiskMonitor()
     private let networkMonitor = NetworkMonitor()
     private let gpuMonitor = GPUMonitor()
+    private let powerMonitor = PowerMonitor()
 
     // Timer
     private var timer: Timer?
@@ -63,10 +65,11 @@ final class SystemMonitor: ObservableObject {
             let processData = self.processMonitor.fetchProcesses()
             let diskData = self.diskMonitor.fetchDiskInfo()
             let gpuData = self.gpuMonitor.fetchGPUInfo()
+            let powerData = self.powerMonitor.fetchPowerInfo()
 
             DispatchQueue.main.async {
                 self.updateUI(cpu: cpuData, memory: memData, network: netData,
-                             processes: processData, disk: diskData, gpu: gpuData)
+                             processes: processData, disk: diskData, gpu: gpuData, power: powerData)
             }
         }
 
@@ -99,23 +102,26 @@ final class SystemMonitor: ObservableObject {
             processData = processMonitor.fetchProcesses()
         }
 
-        // Fetch disk and GPU every 3 cycles
+        // Fetch disk, GPU and power every 3 cycles
         var diskData: DiskInfo? = nil
         var gpuData: GPUInfo? = nil
+        var powerData: PowerInfo? = nil
         if currentCount % 3 == 0 {
             diskData = diskMonitor.fetchDiskInfo()
             gpuData = gpuMonitor.fetchGPUInfo()
+            powerData = powerMonitor.fetchPowerInfo()
         }
 
         // Update UI on main thread
         DispatchQueue.main.async { [weak self] in
             self?.updateUI(cpu: cpuData, memory: memData, network: netData,
-                          processes: processData, disk: diskData, gpu: gpuData)
+                          processes: processData, disk: diskData, gpu: gpuData, power: powerData)
         }
     }
 
     @MainActor private func updateUI(cpu: CPUInfo?, memory: MemoryInfo?, network: NetworkInfo?,
-                                      processes: [ProcessItem]?, disk: DiskInfo?, gpu: GPUInfo?) {
+                                      processes: [ProcessItem]?, disk: DiskInfo?, gpu: GPUInfo?,
+                                      power: PowerInfo?) {
         if let info = cpu {
             cpuInfo = info
             let historyPoint = CPUHistoryPoint(
@@ -177,6 +183,10 @@ final class SystemMonitor: ObservableObject {
 
         if let info = gpu {
             gpuInfo = info
+        }
+
+        if let info = power {
+            powerInfo = info
         }
 
         // Persist a system-wide sample so history survives restarts and long ranges.

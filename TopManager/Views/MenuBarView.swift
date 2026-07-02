@@ -58,6 +58,21 @@ struct MenuBarView: View {
                 }
             }
 
+            if let power = monitor.powerInfo, power.hasBattery {
+                HStack {
+                    Image(systemName: power.isCharging ? "battery.100.bolt" : "battery.100")
+                        .frame(width: 16)
+                    Text("Battery:")
+                    Spacer()
+                    Text("\(power.currentCharge)%")
+                        .monospacedDigit()
+                    if let toEmpty = power.timeToEmpty {
+                        Text("(\(BatteryMath.formatMinutes(toEmpty)))")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+
             Divider()
 
             Button("Open TopManager") {

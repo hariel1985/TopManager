@@ -15,6 +15,7 @@
 		24F63686869A69C8B0FCD7FA /* MetricsStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E786723FC46A64EFF5D3CE4 /* MetricsStoreTests.swift */; };
 		266B888ADE2FDDBCEC8D28A5 /* MemoryLineChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7326AE4B2D75476BDCFE3FFB /* MemoryLineChart.swift */; };
 		2B74C177F49B4358D9642712 /* ProcessDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 332290DABD5326C87258723C /* ProcessDataTests.swift */; };
+		2DE14B65EA1D4E9B4D9DA5A6 /* BatteryMathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70CCC4ED4F2BDC35ABD4F4F6 /* BatteryMathTests.swift */; };
 		341C12CED58388D32ED6C5BB /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F1ACD0492CAB741595DEAA /* ContentView.swift */; };
 		35852165B2DA76AB7F073723 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D71CC63FC2FEF52A069372E /* MenuBarView.swift */; };
 		4427B8406B25B8FEDF27CDBA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 334573CEB47D60570A40B55D /* Assets.xcassets */; };
@@ -28,11 +29,13 @@
 		9F3A8E658859AD9C325E52A8 /* TrendChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AA15E30C4B694CB36DC0893 /* TrendChartView.swift */; };
 		A0649565A902BA48DB10F592 /* CPUMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19ED582C412C63A0A2E2103E /* CPUMonitor.swift */; };
 		A7EC9FB55D5088D669491C11 /* AppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813543165B39EBD213EB3BC7 /* AppsView.swift */; };
+		B0165358B483B0ECC28DB4DE /* PowerInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51C512B13DC0C1024CF39A5E /* PowerInfo.swift */; };
 		B62B18DF32A8734D5908B16B /* DiskInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352CA1BE2A3B43643A9DBD72 /* DiskInfo.swift */; };
 		BCBAC37351B9A3878CC3F01B /* MetricsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05CC33DC4E93F6ED2E52F4E1 /* MetricsStore.swift */; };
 		C077A279E20A90FD6038CCB0 /* ProcessDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 110A314A63AE355A9E04990D /* ProcessDetailView.swift */; };
 		CB7F422FBF9F6D152FC4F41B /* NetworkChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFADE83965AA863B775A910 /* NetworkChartView.swift */; };
 		D6FC8D1EACCB4DED5DF39372 /* TopManagerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A404EBD588B7ACD36079A95D /* TopManagerApp.swift */; };
+		D9E882888E23C26B748E22CF /* PowerMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F7CCD4F64BE7478DFAA17F /* PowerMonitor.swift */; };
 		DB3603F30B6F559BE66E4349 /* SystemMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 279B972C08A878053821285D /* SystemMonitor.swift */; };
 		DE50ECC69FCE60B10364802C /* ByteFormatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78C9B469F6A45F3CC21A7594 /* ByteFormatters.swift */; };
 		E379C349DC9617D6C505B74B /* GPUMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE3BB62AE0DC43777AD00658 /* GPUMonitor.swift */; };
@@ -72,7 +75,9 @@
 		352CA1BE2A3B43643A9DBD72 /* DiskInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskInfo.swift; sourceTree = "<group>"; };
 		44281079654C7E1C9E16806C /* CPUInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUInfo.swift; sourceTree = "<group>"; };
 		4CF69D4888FDBB3669619A1A /* ProcessInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessInfo.swift; sourceTree = "<group>"; };
+		51C512B13DC0C1024CF39A5E /* PowerInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerInfo.swift; sourceTree = "<group>"; };
 		5E1D2EA8E1AD11B42FF225EB /* TopManager.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TopManager.entitlements; sourceTree = "<group>"; };
+		70CCC4ED4F2BDC35ABD4F4F6 /* BatteryMathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryMathTests.swift; sourceTree = "<group>"; };
 		7326AE4B2D75476BDCFE3FFB /* MemoryLineChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryLineChart.swift; sourceTree = "<group>"; };
 		78C9B469F6A45F3CC21A7594 /* ByteFormatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ByteFormatters.swift; sourceTree = "<group>"; };
 		7B6F97E6EF65AA17A469F037 /* ProcessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessView.swift; sourceTree = "<group>"; };
@@ -81,6 +86,7 @@
 		8F402CE13EF67DE550786B79 /* MemoryDonutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryDonutView.swift; sourceTree = "<group>"; };
 		94D5A13CC5B9CF1B90CC2214 /* CPUChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUChartView.swift; sourceTree = "<group>"; };
 		95B3F62455B01B2E9C0D76A9 /* DiskUsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskUsageView.swift; sourceTree = "<group>"; };
+		95F7CCD4F64BE7478DFAA17F /* PowerMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PowerMonitor.swift; sourceTree = "<group>"; };
 		9AA15E30C4B694CB36DC0893 /* TrendChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrendChartView.swift; sourceTree = "<group>"; };
 		9D71CC63FC2FEF52A069372E /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		A3A3D0B1EB522C9975F71DA8 /* TopManager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TopManager.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -104,6 +110,7 @@
 				27FDD19B8DBB7D955A5ECB5B /* MemoryMonitor.swift */,
 				05CC33DC4E93F6ED2E52F4E1 /* MetricsStore.swift */,
 				347E47F825E496F40FD8ED11 /* NetworkMonitor.swift */,
+				95F7CCD4F64BE7478DFAA17F /* PowerMonitor.swift */,
 				295232B4C746511757DCF8FE /* ProcessMonitor.swift */,
 				279B972C08A878053821285D /* SystemMonitor.swift */,
 			);
@@ -127,6 +134,7 @@
 				F481045B4FC6017F50849FF1 /* GPUInfo.swift */,
 				BD3EDCDEDF4A0CE1921A3B25 /* MemoryInfo.swift */,
 				3010F605712E09175D9D8878 /* NetworkInfo.swift */,
+				51C512B13DC0C1024CF39A5E /* PowerInfo.swift */,
 				4CF69D4888FDBB3669619A1A /* ProcessInfo.swift */,
 			);
 			path = Models;
@@ -210,6 +218,7 @@
 		D078BA97D4F498E5282AC5E0 /* TopManagerTests */ = {
 			isa = PBXGroup;
 			children = (
+				70CCC4ED4F2BDC35ABD4F4F6 /* BatteryMathTests.swift */,
 				301352EB5B362C732CE1A246 /* FormattingTests.swift */,
 				0E786723FC46A64EFF5D3CE4 /* MetricsStoreTests.swift */,
 				332290DABD5326C87258723C /* ProcessDataTests.swift */,
@@ -330,6 +339,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2DE14B65EA1D4E9B4D9DA5A6 /* BatteryMathTests.swift in Sources */,
 				49D85FF611927294159C89D1 /* FormattingTests.swift in Sources */,
 				24F63686869A69C8B0FCD7FA /* MetricsStoreTests.swift in Sources */,
 				2B74C177F49B4358D9642712 /* ProcessDataTests.swift in Sources */,
@@ -361,6 +371,8 @@
 				E4AF7F7CA1E1FE8638CA5A77 /* NetworkInfo.swift in Sources */,
 				EB0D84848F42134927F9C9B1 /* NetworkMonitor.swift in Sources */,
 				00EC5A90B7B8C6C5015D90D1 /* PerformanceView.swift in Sources */,
+				B0165358B483B0ECC28DB4DE /* PowerInfo.swift in Sources */,
+				D9E882888E23C26B748E22CF /* PowerMonitor.swift in Sources */,
 				501C13D57386C179C0B3B14B /* PowerStorageView.swift in Sources */,
 				C077A279E20A90FD6038CCB0 /* ProcessDetailView.swift in Sources */,
 				744F52D036D1F3E081923382 /* ProcessInfo.swift in Sources */,
