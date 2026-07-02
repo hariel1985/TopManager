@@ -4,10 +4,12 @@ import AppKit
 
 final class ProcessMonitor {
     private var previousCPUTimes: [pid_t: (user: UInt64, system: UInt64, timestamp: Date)] = [:]
+    private var previousDiskIO: [pid_t: (read: UInt64, write: UInt64, idle: UInt64, timestamp: Date)] = [:]
     private var lastKnownCPU: [pid_t: Double] = [:]  // Cache last known CPU usage
     private let iconCache = NSCache<NSNumber, NSImage>()
     private var noIconPids: Set<pid_t> = []  // Cache for PIDs with no icon
     private var nameCache: [pid_t: String] = [:]
+    private var pathCache: [pid_t: String] = [:]     // Full executable path
     private var userCache: [uid_t: String] = [:]
     private let timebaseInfo: mach_timebase_info_data_t
     private var refreshCounter = 0
@@ -48,8 +50,10 @@ final class ProcessMonitor {
         let stalePids = Set(nameCache.keys).subtracting(currentPids)
         for pid in stalePids {
             nameCache.removeValue(forKey: pid)
+            pathCache.removeValue(forKey: pid)
             iconCache.removeObject(forKey: NSNumber(value: pid))
             previousCPUTimes.removeValue(forKey: pid)
+            previousDiskIO.removeValue(forKey: pid)
             noIconPids.remove(pid)
             lastKnownCPU.removeValue(forKey: pid)
         }
@@ -80,6 +84,11 @@ final class ProcessMonitor {
         let memoryUsage: Int64
         let threadCount: Int32
         let cpuUsage: Double
+        var diskReadRate: Double = 0
+        var diskWriteRate: Double = 0
+        var diskReadBytes: UInt64 = 0
+        var diskWriteBytes: UInt64 = 0
+        var energyImpact: Double = 0
 
         if needsDetailedInfo {
             var taskInfo = proc_taskinfo()
@@ -96,6 +105,17 @@ final class ProcessMonitor {
                     userTime: rusageData.userTime,
                     systemTime: rusageData.systemTime
                 )
+                let extra = computeExtraRates(
+                    pid: pid,
+                    diskRead: rusageData.diskRead,
+                    diskWrite: rusageData.diskWrite,
+                    idleWakeups: rusageData.idleWakeups
+                )
+                diskReadRate = extra.readRate
+                diskWriteRate = extra.writeRate
+                diskReadBytes = rusageData.diskRead
+                diskWriteBytes = rusageData.diskWrite
+                energyImpact = EnergyModel.impact(cpuPercent: cpuUsage, idleWakeupsPerSec: extra.idleWakeupsPerSec)
             } else {
                 memoryUsage = 0
                 threadCount = 0
@@ -126,7 +146,13 @@ final class ProcessMonitor {
             state: state,
             icon: icon,
             parentPid: parentPid,
-            startTime: startTime
+            startTime: startTime,
+            diskReadRate: diskReadRate,
+            diskWriteRate: diskWriteRate,
+            diskReadBytes: diskReadBytes,
+            diskWriteBytes: diskWriteBytes,
+            energyImpact: energyImpact,
+            executablePath: pathCache[pid]
         )
     }
 
@@ -150,6 +176,7 @@ final class ProcessMonitor {
             // This protects against edge cases where buffer might not be null-terminated
             let pathData = Data(bytes: pathBuffer, count: pathLength)
             if let path = String(data: pathData, encoding: .utf8) {
+                pathCache[pid] = path
                 name = (path as NSString).lastPathComponent
             } else {
                 name = "Process \(pid)"
@@ -203,7 +230,16 @@ final class ProcessMonitor {
         return name
     }
 
-    private func fetchRusageData(pid: pid_t) -> (memory: Int64, userTime: UInt64, systemTime: UInt64) {
+    private struct RusageData {
+        var memory: Int64 = 0
+        var userTime: UInt64 = 0
+        var systemTime: UInt64 = 0
+        var diskRead: UInt64 = 0
+        var diskWrite: UInt64 = 0
+        var idleWakeups: UInt64 = 0
+    }
+
+    private func fetchRusageData(pid: pid_t) -> RusageData {
         var rusage = rusage_info_v4()
         let result = withUnsafeMutablePointer(to: &rusage) { ptr -> Int32 in
             ptr.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { rusagePtr in
@@ -212,25 +248,45 @@ final class ProcessMonitor {
         }
 
         if result == 0 {
-            return (
+            return RusageData(
                 memory: Int64(rusage.ri_phys_footprint),
                 userTime: rusage.ri_user_time,
-                systemTime: rusage.ri_system_time
+                systemTime: rusage.ri_system_time,
+                diskRead: rusage.ri_diskio_bytesread,
+                diskWrite: rusage.ri_diskio_byteswritten,
+                idleWakeups: rusage.ri_pkg_idle_wkups
             )
         }
 
-        // Fallback to proc_taskinfo if rusage fails
+        // Fallback to proc_taskinfo if rusage fails (no disk/wakeup data available)
         var taskInfo = proc_taskinfo()
         let taskInfoSize = Int32(MemoryLayout<proc_taskinfo>.size)
         if proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &taskInfo, taskInfoSize) == taskInfoSize {
-            return (
+            return RusageData(
                 memory: Int64(taskInfo.pti_resident_size),
                 userTime: taskInfo.pti_total_user,
                 systemTime: taskInfo.pti_total_system
             )
         }
 
-        return (memory: 0, userTime: 0, systemTime: 0)
+        return RusageData()
+    }
+
+    /// Computes per-second disk read/write and idle-wakeup rates from cumulative
+    /// counters, using the previous snapshot. Mirrors the CPU delta approach.
+    private func computeExtraRates(pid: pid_t, diskRead: UInt64, diskWrite: UInt64, idleWakeups: UInt64)
+        -> (readRate: Double, writeRate: Double, idleWakeupsPerSec: Double) {
+        let now = Date()
+        defer { previousDiskIO[pid] = (diskRead, diskWrite, idleWakeups, now) }
+
+        guard let prev = previousDiskIO[pid] else { return (0, 0, 0) }
+        let dt = now.timeIntervalSince(prev.timestamp)
+        guard dt > 0 else { return (0, 0, 0) }
+
+        let readRate = diskRead >= prev.read ? Double(diskRead - prev.read) / dt : 0
+        let writeRate = diskWrite >= prev.write ? Double(diskWrite - prev.write) / dt : 0
+        let idleRate = idleWakeups >= prev.idle ? Double(idleWakeups - prev.idle) / dt : 0
+        return (readRate, writeRate, idleRate)
     }
 
     private func fetchBasicProcessInfo(pid: pid_t) -> ProcessItem? {
@@ -372,4 +428,56 @@ final class ProcessMonitor {
     func clearCPUHistory() {
         previousCPUTimes.removeAll()
     }
+}
+
+// MARK: - On-demand deep inspection (called only when the inspector is open)
+
+/// Pure parser for a KERN_PROCARGS2 buffer, split out so it is unit-testable
+/// without a live process. Layout: [Int32 argc][exec_path\0][\0 padding][argv…][envp…]
+enum ProcArgs {
+    static func parse(_ bytes: [UInt8]) -> (path: String, args: [String])? {
+        guard bytes.count > 4 else { return nil }
+        // argc: first 4 bytes, host little-endian (arm64/x86_64)
+        let argc = Int(bytes[0]) | (Int(bytes[1]) << 8) | (Int(bytes[2]) << 16) | (Int(bytes[3]) << 24)
+        guard argc >= 0 else { return nil }
+
+        var i = 4
+        let pathStart = i
+        while i < bytes.count && bytes[i] != 0 { i += 1 }
+        let path = String(decoding: bytes[pathStart..<i], as: UTF8.self)
+
+        // Skip the NUL padding between exec_path and argv[0]
+        while i < bytes.count && bytes[i] == 0 { i += 1 }
+
+        var args: [String] = []
+        var consumed = 0
+        while consumed < argc && i < bytes.count {
+            let start = i
+            while i < bytes.count && bytes[i] != 0 { i += 1 }
+            args.append(String(decoding: bytes[start..<i], as: UTF8.self))
+            i += 1 // skip the NUL terminator
+            consumed += 1
+        }
+        return (path, args)
+    }
+}
+
+/// Fetches the launch arguments for a process (works for the current user's
+/// processes without elevated privileges; returns [] when denied/unavailable).
+func fetchProcessArguments(pid: pid_t) -> [String] {
+    var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
+    var size = 0
+    guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > 0 else { return [] }
+
+    var buffer = [UInt8](repeating: 0, count: size)
+    guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0 else { return [] }
+    // sysctl may shrink `size`; only parse what was actually written.
+    return ProcArgs.parse(Array(buffer.prefix(size)))?.args ?? []
+}
+
+/// Counts open file descriptors for a process (files, sockets, pipes, …).
+func fetchOpenFileCount(pid: pid_t) -> Int? {
+    let bufferSize = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
+    guard bufferSize > 0 else { return nil }
+    return Int(bufferSize) / MemoryLayout<proc_fdinfo>.stride
 }

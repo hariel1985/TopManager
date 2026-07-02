@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum ProcessSortColumn: String {
-    case name, pid, cpu, cpuTotal, memory, threads, user, state
+    case name, pid, cpu, cpuTotal, memory, threads, user, state, energy, disk
 }
 
 struct ProcessView: View {
@@ -29,6 +29,9 @@ struct ProcessView: View {
     @State private var showErrorAlert = false
     @State private var errorTitle = ""
     @State private var errorMessage = ""
+
+    // Deep-dive inspector
+    @State private var inspectorProcess: ProcessItem?
 
     // Protected system processes that cannot be force-killed via UI
     private static let protectedProcesses = ["kernel_task", "launchd", "WindowServer", "loginwindow"]
@@ -63,6 +66,10 @@ struct ProcessView: View {
                 comparison = lhs.user.localizedCaseInsensitiveCompare(rhs.user)
             case .state:
                 comparison = lhs.state.rawValue.compare(rhs.state.rawValue)
+            case .energy:
+                comparison = lhs.energyImpact < rhs.energyImpact ? .orderedAscending : (lhs.energyImpact > rhs.energyImpact ? .orderedDescending : .orderedSame)
+            case .disk:
+                comparison = lhs.diskTotalRate < rhs.diskTotalRate ? .orderedAscending : (lhs.diskTotalRate > rhs.diskTotalRate ? .orderedDescending : .orderedSame)
             }
 
             // Primary sort
@@ -89,23 +96,22 @@ struct ProcessView: View {
 
             // Process table
             Table(displayedProcesses, selection: $selectedProcess, sortOrder: $sortOrder) {
-                TableColumn("") { process in
-                    if let icon = process.icon {
-                        Image(nsImage: icon)
-                            .resizable()
-                            .frame(width: 16, height: 16)
-                    } else {
-                        Image(systemName: "app.dashed")
-                            .frame(width: 16, height: 16)
+                TableColumn("Name", value: \.name) { process in
+                    HStack(spacing: 6) {
+                        if let icon = process.icon {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .frame(width: 16, height: 16)
+                        } else {
+                            Image(systemName: "app.dashed")
+                                .frame(width: 16, height: 16)
+                                .foregroundColor(.secondary)
+                        }
+                        Text(process.name)
+                            .lineLimit(1)
                     }
                 }
-                .width(24)
-
-                TableColumn("Name", value: \.name) { process in
-                    Text(process.name)
-                        .lineLimit(1)
-                }
-                .width(min: 150, ideal: 200)
+                .width(min: 170, ideal: 220)
 
                 TableColumn("PID", value: \.pid) { process in
                     Text("\(process.pid)")
@@ -127,11 +133,28 @@ struct ProcessView: View {
                 }
                 .width(70)
 
+                TableColumn("Energy", value: \.energyImpact) { process in
+                    Text(String(format: "%.1f", process.energyImpact))
+                        .monospacedDigit()
+                        .foregroundColor(energyColor(process.energyImpact))
+                }
+                .width(60)
+
                 TableColumn("Memory", value: \.memoryUsage) { process in
                     Text(formatBytes(process.memoryUsage))
                         .monospacedDigit()
                 }
                 .width(80)
+
+                TableColumn("Disk I/O", value: \.diskTotalRate) { process in
+                    if process.diskTotalRate > 0 {
+                        Text(formatBytesPerSecond(process.diskTotalRate))
+                            .monospacedDigit()
+                    } else {
+                        Text("—").foregroundColor(.secondary)
+                    }
+                }
+                .width(90)
 
                 TableColumn("Threads", value: \.threadCount) { process in
                     Text("\(process.threadCount)")
@@ -157,6 +180,10 @@ struct ProcessView: View {
             .contextMenu(forSelectionType: ProcessItem.ID.self) { selection in
                 if let pid = selection.first,
                    let process = monitor.processes.first(where: { $0.pid == pid }) {
+                    Button("Get Info (⌘I)") {
+                        inspectorProcess = process
+                    }
+                    Divider()
                     Button("Terminate (⌫)") {
                         initiateTerminate()
                     }
@@ -177,7 +204,11 @@ struct ProcessView: View {
                     }
                 }
             } primaryAction: { selection in
-                // Double-click action
+                // Double-click opens the deep-dive inspector
+                if let pid = selection.first,
+                   let process = monitor.processes.first(where: { $0.pid == pid }) {
+                    inspectorProcess = process
+                }
             }
             .onDeleteCommand {
                 initiateTerminate()
@@ -211,6 +242,10 @@ struct ProcessView: View {
                 sortColumn = .cpuTotal
             } else if keyPathString.contains("cpuUsage") {
                 sortColumn = .cpu
+            } else if keyPathString.contains("energyImpact") {
+                sortColumn = .energy
+            } else if keyPathString.contains("diskTotalRate") {
+                sortColumn = .disk
             } else if keyPathString.contains("memoryUsage") {
                 sortColumn = .memory
             } else if keyPathString.contains("name") {
@@ -229,7 +264,10 @@ struct ProcessView: View {
         }
         .background(
             KeyboardShortcutHandler(
-                onCommandBackspace: { initiateForceKill() }
+                onCommandBackspace: { initiateForceKill() },
+                onCommandI: {
+                    if let process = selectedProcessItem { inspectorProcess = process }
+                }
             )
         )
         .sheet(isPresented: $showTerminateConfirm) {
@@ -267,6 +305,10 @@ struct ProcessView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorMessage)
+        }
+        .sheet(item: $inspectorProcess) { process in
+            ProcessInspectorSheet(initialProcess: process)
+                .environmentObject(monitor)
         }
     }
 
@@ -345,6 +387,17 @@ struct ProcessView: View {
         } else if usage > 5 {
             return .orange
         } else if usage > 2 {
+            return .yellow
+        }
+        return .primary
+    }
+
+    private func energyColor(_ impact: Double) -> Color {
+        if impact > 50 {
+            return .red
+        } else if impact > 20 {
+            return .orange
+        } else if impact > 8 {
             return .yellow
         }
         return .primary
@@ -441,26 +494,37 @@ struct ConfirmationSheet: View {
 
 struct KeyboardShortcutHandler: NSViewRepresentable {
     let onCommandBackspace: () -> Void
+    var onCommandI: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> NSView {
         let view = KeyCaptureView()
         view.onCommandBackspace = onCommandBackspace
+        view.onCommandI = onCommandI
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
         if let view = nsView as? KeyCaptureView {
             view.onCommandBackspace = onCommandBackspace
+            view.onCommandI = onCommandI
         }
     }
 
     class KeyCaptureView: NSView {
         var onCommandBackspace: (() -> Void)?
+        var onCommandI: (() -> Void)?
 
         override func performKeyEquivalent(with event: NSEvent) -> Bool {
-            // Backspace = keyCode 51
-            if event.keyCode == 51 && event.modifierFlags.contains(.command) {
+            guard event.modifierFlags.contains(.command) else {
+                return super.performKeyEquivalent(with: event)
+            }
+            // Backspace = keyCode 51, "i" = keyCode 34
+            if event.keyCode == 51 {
                 onCommandBackspace?()
+                return true
+            }
+            if event.keyCode == 34 {
+                onCommandI?()
                 return true
             }
             return super.performKeyEquivalent(with: event)

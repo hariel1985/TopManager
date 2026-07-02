@@ -14,8 +14,16 @@ struct ProcessItem: Identifiable, Hashable {
     let icon: NSImage?
     let parentPid: pid_t
     let startTime: Date?
+    let diskReadRate: Double    // bytes/sec read from disk
+    let diskWriteRate: Double   // bytes/sec written to disk
+    let diskReadBytes: UInt64   // cumulative bytes read
+    let diskWriteBytes: UInt64  // cumulative bytes written
+    let energyImpact: Double    // heuristic energy-impact score (proxy for Activity Monitor's)
+    let executablePath: String?
 
     var iconPlaceholder: String { "" }
+
+    var diskTotalRate: Double { diskReadRate + diskWriteRate }
 
     init(
         pid: pid_t,
@@ -28,7 +36,13 @@ struct ProcessItem: Identifiable, Hashable {
         state: ProcessState,
         icon: NSImage?,
         parentPid: pid_t,
-        startTime: Date?
+        startTime: Date?,
+        diskReadRate: Double = 0,
+        diskWriteRate: Double = 0,
+        diskReadBytes: UInt64 = 0,
+        diskWriteBytes: UInt64 = 0,
+        energyImpact: Double = 0,
+        executablePath: String? = nil
     ) {
         self.id = pid
         self.pid = pid
@@ -42,6 +56,12 @@ struct ProcessItem: Identifiable, Hashable {
         self.icon = icon
         self.parentPid = parentPid
         self.startTime = startTime
+        self.diskReadRate = diskReadRate
+        self.diskWriteRate = diskWriteRate
+        self.diskReadBytes = diskReadBytes
+        self.diskWriteBytes = diskWriteBytes
+        self.energyImpact = energyImpact
+        self.executablePath = executablePath
     }
 
     func hash(into hasher: inout Hasher) {
@@ -54,7 +74,19 @@ struct ProcessItem: Identifiable, Hashable {
         lhs.cpuUsageTotal == rhs.cpuUsageTotal &&
         lhs.memoryUsage == rhs.memoryUsage &&
         lhs.threadCount == rhs.threadCount &&
-        lhs.state == rhs.state
+        lhs.state == rhs.state &&
+        lhs.diskReadRate == rhs.diskReadRate &&
+        lhs.diskWriteRate == rhs.diskWriteRate &&
+        lhs.energyImpact == rhs.energyImpact
+    }
+}
+
+/// Heuristic "energy impact" proxy. This is *not* Apple's exact private formula;
+/// it approximates it: sustained CPU dominates, with a smaller penalty for idle
+/// (timer) wakeups, which correlate with power draw even at low CPU.
+enum EnergyModel {
+    static func impact(cpuPercent: Double, idleWakeupsPerSec: Double) -> Double {
+        max(0, cpuPercent) + max(0, idleWakeupsPerSec) * 0.045
     }
 }
 
