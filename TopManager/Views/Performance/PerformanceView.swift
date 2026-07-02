@@ -31,6 +31,7 @@ struct PerformanceView: View {
 
 struct CPUTabView: View {
     @EnvironmentObject var monitor: SystemMonitor
+    @State private var range: HistoryRange = .live
 
     private let coreColumns = [
         GridItem(.flexible()),
@@ -48,6 +49,7 @@ struct CPUTabView: View {
                         HStack {
                             Text("Total CPU Usage")
                                 .font(.headline)
+                            HistoryRangePicker(range: $range)
                             Spacer()
                             if let cpu = monitor.cpuInfo {
                                 Text(String(format: "%.1f%%", cpu.globalUsage))
@@ -57,8 +59,13 @@ struct CPUTabView: View {
                             }
                         }
 
-                        CPULineChart(history: monitor.cpuHistory)
-                            .frame(height: 120)
+                        if range == .live {
+                            CPULineChart(history: monitor.cpuHistory)
+                                .frame(height: 120)
+                        } else {
+                            MetricTrendChart(samples: MetricsStore.shared.downsampled(for: range), metric: .cpu)
+                                .frame(height: 120)
+                        }
 
                         // Legend
                         HStack(spacing: 20) {
@@ -201,6 +208,7 @@ struct CoreLineChartView: View {
 
 struct MemoryTabView: View {
     @EnvironmentObject var monitor: SystemMonitor
+    @State private var range: HistoryRange = .live
 
     var body: some View {
         ScrollView {
@@ -230,6 +238,7 @@ struct MemoryTabView: View {
                                 HStack {
                                     Text("Memory Usage Over Time")
                                         .font(.headline)
+                                    HistoryRangePicker(range: $range)
                                     Spacer()
                                     if let mem = monitor.memoryInfo {
                                         Text(String(format: "%.1f%%", mem.usagePercentage))
@@ -239,8 +248,13 @@ struct MemoryTabView: View {
                                     }
                                 }
 
-                                MemoryLineChart(history: monitor.memoryHistory)
-                                    .frame(height: 150)
+                                if range == .live {
+                                    MemoryLineChart(history: monitor.memoryHistory)
+                                        .frame(height: 150)
+                                } else {
+                                    MetricTrendChart(samples: MetricsStore.shared.downsampled(for: range), metric: .memory)
+                                        .frame(height: 150)
+                                }
 
                                 if let mem = monitor.memoryInfo {
                                     HStack {
@@ -394,6 +408,7 @@ struct MemoryStatItem: View {
 
 struct NetworkTabView: View {
     @EnvironmentObject var monitor: SystemMonitor
+    @State private var range: HistoryRange = .live
 
     var body: some View {
         ScrollView {
@@ -405,6 +420,7 @@ struct NetworkTabView: View {
                             Label("Download", systemImage: "arrow.down.circle")
                                 .font(.headline)
                                 .foregroundColor(.blue)
+                            HistoryRangePicker(range: $range)
                             Spacer()
                             if let net = monitor.networkInfo {
                                 Text(formatBytesPerSecond(net.totalDownloadRate))
@@ -414,8 +430,13 @@ struct NetworkTabView: View {
                             }
                         }
 
-                        DownloadLineChart(history: monitor.networkHistory)
-                            .frame(height: 150)
+                        if range == .live {
+                            DownloadLineChart(history: monitor.networkHistory)
+                                .frame(height: 150)
+                        } else {
+                            MetricTrendChart(samples: MetricsStore.shared.downsampled(for: range), metric: .download)
+                                .frame(height: 150)
+                        }
                     }
                     .padding(.vertical, 8)
                 }
@@ -436,8 +457,13 @@ struct NetworkTabView: View {
                             }
                         }
 
-                        UploadLineChart(history: monitor.networkHistory)
-                            .frame(height: 150)
+                        if range == .live {
+                            UploadLineChart(history: monitor.networkHistory)
+                                .frame(height: 150)
+                        } else {
+                            MetricTrendChart(samples: MetricsStore.shared.downsampled(for: range), metric: .upload)
+                                .frame(height: 150)
+                        }
                     }
                     .padding(.vertical, 8)
                 }

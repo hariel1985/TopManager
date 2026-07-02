@@ -81,6 +81,7 @@ final class SystemMonitor: ObservableObject {
     @MainActor func stopMonitoring() {
         timer?.invalidate()
         timer = nil
+        MetricsStore.shared.flush()
     }
 
     private func refreshAllBackground() {
@@ -176,6 +177,18 @@ final class SystemMonitor: ObservableObject {
 
         if let info = gpu {
             gpuInfo = info
+        }
+
+        // Persist a system-wide sample so history survives restarts and long ranges.
+        if let c = cpuInfo, let m = memoryInfo {
+            MetricsStore.shared.record(MetricsSample(
+                t: c.timestamp,
+                cpu: c.globalUsage,
+                memUsed: m.usedMemory,
+                memTotal: m.totalMemory,
+                netDown: networkInfo?.totalDownloadRate ?? 0,
+                netUp: networkInfo?.totalUploadRate ?? 0
+            ))
         }
     }
 
