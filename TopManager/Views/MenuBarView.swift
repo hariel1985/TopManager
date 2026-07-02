@@ -1,8 +1,36 @@
 import SwiftUI
 
+/// The compact menu-bar title. Renders whichever metric the user picked.
+struct MenuBarLabel: View {
+    @ObservedObject var monitor: SystemMonitor
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var alerts: AlertCenter
+
+    var body: some View {
+        switch settings.menuBarMetric {
+        case .cpu:
+            textOrIcon(monitor.cpuInfo.map { String(format: "%.0f%%", $0.globalUsage) }, icon: "cpu")
+        case .memory:
+            textOrIcon(monitor.memoryInfo.map { String(format: "%.0f%%", $0.usagePercentage) }, icon: "memorychip")
+        case .health:
+            Text("♥ \(alerts.healthScore)").monospacedDigit()
+        case .download:
+            textOrIcon(monitor.networkInfo.map { formatBytesPerSecond($0.totalDownloadRate) }, icon: "arrow.down")
+        }
+    }
+
+    @ViewBuilder private func textOrIcon(_ text: String?, icon: String) -> some View {
+        if let text { Text(text).monospacedDigit() } else { Image(systemName: icon) }
+    }
+}
+
 struct MenuBarView: View {
     @EnvironmentObject var monitor: SystemMonitor
     @EnvironmentObject var alertCenter: AlertCenter
+
+    private var topCPU: [ProcessItem] {
+        monitor.processes.sorted { $0.cpuUsage > $1.cpuUsage }.prefix(3).map { $0 }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -86,6 +114,31 @@ struct MenuBarView: View {
                     if let toEmpty = power.timeToEmpty {
                         Text("(\(BatteryMath.formatMinutes(toEmpty)))")
                             .foregroundColor(.secondary)
+                    }
+                }
+            }
+
+            if !topCPU.isEmpty {
+                Divider()
+                Text("Top CPU Consumers")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                ForEach(topCPU) { process in
+                    HStack(spacing: 6) {
+                        Text(process.name)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Spacer()
+                        Text(String(format: "%.0f%%", process.cpuUsage))
+                            .monospacedDigit()
+                            .foregroundColor(.secondary)
+                        Button {
+                            _ = monitor.terminateProcess(process.pid, expectedStartTime: process.startTime)
+                        } label: {
+                            Image(systemName: "xmark.circle")
+                        }
+                        .buttonStyle(.borderless)
+                        .help("Quit \(process.name)")
                     }
                 }
             }

@@ -73,12 +73,23 @@ final class SystemMonitor: ObservableObject {
             }
         }
 
-        // Start periodic refresh (3 second interval)
-        timer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
+        // Start periodic refresh at the user-configured cadence
+        scheduleTimer(interval: AppSettings.shared.refreshInterval)
+    }
+
+    private func scheduleTimer(interval: Double) {
+        timer?.invalidate()
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.backgroundQueue.async {
                 self?.refreshAllBackground()
             }
         }
+    }
+
+    /// Change the refresh cadence at runtime (from Settings). No-op if not monitoring.
+    @MainActor func updateRefreshInterval(_ interval: Double) {
+        guard timer != nil else { return }
+        scheduleTimer(interval: AppSettings.clampInterval(interval))
     }
 
     @MainActor func stopMonitoring() {

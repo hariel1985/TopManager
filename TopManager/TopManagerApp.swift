@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct TopManagerApp: App {
     @StateObject private var monitor = SystemMonitor.shared
+    @StateObject private var settings = AppSettings.shared
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
 
@@ -19,8 +20,10 @@ struct TopManagerApp: App {
             ContentView()
                 .environmentObject(monitor)
                 .environmentObject(AlertCenter.shared)
+                .environmentObject(settings)
                 .onAppear {
                     monitor.startMonitoring()
+                    settings.applyAll()
                     AlertCenter.shared.requestNotificationAuthorization()
                 }
         }
@@ -35,18 +38,19 @@ struct TopManagerApp: App {
             CommandGroup(replacing: .newItem) { }
         }
 
-        // Menu Bar Extra showing CPU %
+        Settings {
+            SettingsView()
+                .environmentObject(settings)
+        }
+
+        // Menu Bar Extra with configurable metric
         MenuBarExtra {
             MenuBarView()
                 .environmentObject(monitor)
                 .environmentObject(AlertCenter.shared)
+                .environmentObject(settings)
         } label: {
-            if let cpu = monitor.cpuInfo {
-                Text(String(format: "%.0f%%", cpu.globalUsage))
-                    .monospacedDigit()
-            } else {
-                Image(systemName: "cpu")
-            }
+            MenuBarLabel(monitor: monitor, settings: settings, alerts: AlertCenter.shared)
         }
         .menuBarExtraStyle(.window)
     }
