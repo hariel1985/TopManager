@@ -200,6 +200,26 @@ final class SystemMonitor: ObservableObject {
                 netUp: networkInfo?.totalUploadRate ?? 0
             ))
         }
+
+        // Proactive health + alert evaluation (runs every cycle).
+        AlertCenter.shared.evaluate(
+            cpuUsage: cpuInfo?.globalUsage ?? 0,
+            memory: memoryInfo,
+            disk: diskInfo,
+            thermal: currentThermalLevel(),
+            topProcess: self.processes.max { $0.cpuUsage < $1.cpuUsage },
+            power: powerInfo
+        )
+    }
+
+    private func currentThermalLevel() -> ThermalLevel {
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal: return .nominal
+        case .fair: return .fair
+        case .serious: return .serious
+        case .critical: return .critical
+        @unknown default: return .nominal
+        }
     }
 
     // Process control methods with PID validation

@@ -2,9 +2,26 @@ import SwiftUI
 
 struct MenuBarView: View {
     @EnvironmentObject var monitor: SystemMonitor
+    @EnvironmentObject var alertCenter: AlertCenter
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "heart.text.square")
+                    .frame(width: 16)
+                    .foregroundColor(healthColor)
+                Text("Health:")
+                Spacer()
+                Text("\(alertCenter.healthScore)/100")
+                    .monospacedDigit()
+                    .foregroundColor(healthColor)
+                if alertCenter.activeAlertCount > 0 {
+                    Image(systemName: "bell.badge.fill")
+                        .foregroundColor(.orange)
+                }
+            }
+            Divider()
+
             if let cpu = monitor.cpuInfo {
                 HStack {
                     Image(systemName: "cpu")
@@ -88,7 +105,16 @@ struct MenuBarView: View {
             .keyboardShortcut("q")
         }
         .padding(12)
-        .frame(width: 220)
+        .frame(width: 240)
+    }
+
+    private var healthColor: Color {
+        switch alertCenter.healthScore {
+        case 85...: return .green
+        case 70..<85: return .mint
+        case 50..<70: return .orange
+        default: return .red
+        }
     }
 }
 

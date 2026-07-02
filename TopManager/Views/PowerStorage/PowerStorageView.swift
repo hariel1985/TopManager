@@ -6,6 +6,9 @@ struct PowerStorageView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // System Health score + diagnosis
+                HealthCardView()
+
                 // System Status and GPU side by side
                 HStack(alignment: .top, spacing: 20) {
                     // System Status (left column)

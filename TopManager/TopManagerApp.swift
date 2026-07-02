@@ -18,8 +18,10 @@ struct TopManagerApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(monitor)
+                .environmentObject(AlertCenter.shared)
                 .onAppear {
                     monitor.startMonitoring()
+                    AlertCenter.shared.requestNotificationAuthorization()
                 }
         }
         .windowStyle(.automatic)
@@ -37,6 +39,7 @@ struct TopManagerApp: App {
         MenuBarExtra {
             MenuBarView()
                 .environmentObject(monitor)
+                .environmentObject(AlertCenter.shared)
         } label: {
             if let cpu = monitor.cpuInfo {
                 Text(String(format: "%.0f%%", cpu.globalUsage))
