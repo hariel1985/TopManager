@@ -16,6 +16,7 @@
 		341C12CED58388D32ED6C5BB /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4F1ACD0492CAB741595DEAA /* ContentView.swift */; };
 		35852165B2DA76AB7F073723 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D71CC63FC2FEF52A069372E /* MenuBarView.swift */; };
 		4427B8406B25B8FEDF27CDBA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 334573CEB47D60570A40B55D /* Assets.xcassets */; };
+		49D85FF611927294159C89D1 /* FormattingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 301352EB5B362C732CE1A246 /* FormattingTests.swift */; };
 		501C13D57386C179C0B3B14B /* PowerStorageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6038CCDF3BDF0F8BC93C9D4 /* PowerStorageView.swift */; };
 		744F52D036D1F3E081923382 /* ProcessInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CF69D4888FDBB3669619A1A /* ProcessInfo.swift */; };
 		7A1144E43159D96564C13164 /* MemoryInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD3EDCDEDF4A0CE1921A3B25 /* MemoryInfo.swift */; };
@@ -38,7 +39,18 @@
 		FA252F9182ADDA26AD1E54DE /* CPUChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94D5A13CC5B9CF1B90CC2214 /* CPUChartView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		B01CE3A16D70795D608951EE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4BAFF5CBBA9A1302C6CCDCD2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F86DD5615146D759EB0D44EB;
+			remoteInfo = TopManager;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		0F5A69E0EE7FDD44157911D7 /* TopManagerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TopManagerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		110A314A63AE355A9E04990D /* ProcessDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessDetailView.swift; sourceTree = "<group>"; };
 		162FC58F6C44EC1DD7022A86 /* DiskMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiskMonitor.swift; sourceTree = "<group>"; };
 		19ED582C412C63A0A2E2103E /* CPUMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CPUMonitor.swift; sourceTree = "<group>"; };
@@ -46,6 +58,7 @@
 		27FDD19B8DBB7D955A5ECB5B /* MemoryMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryMonitor.swift; sourceTree = "<group>"; };
 		295232B4C746511757DCF8FE /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
 		3010F605712E09175D9D8878 /* NetworkInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkInfo.swift; sourceTree = "<group>"; };
+		301352EB5B362C732CE1A246 /* FormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormattingTests.swift; sourceTree = "<group>"; };
 		334573CEB47D60570A40B55D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		33BCE156CB39EDADFFC938F9 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		347E47F825E496F40FD8ED11 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
@@ -92,6 +105,7 @@
 			isa = PBXGroup;
 			children = (
 				36BB5A20B1330E54F2DCF357 /* TopManager */,
+				D078BA97D4F498E5282AC5E0 /* TopManagerTests */,
 				E6438D9AF8EDEFEDCB087B38 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -183,10 +197,19 @@
 			path = PowerStorage;
 			sourceTree = "<group>";
 		};
+		D078BA97D4F498E5282AC5E0 /* TopManagerTests */ = {
+			isa = PBXGroup;
+			children = (
+				301352EB5B362C732CE1A246 /* FormattingTests.swift */,
+			);
+			path = TopManagerTests;
+			sourceTree = "<group>";
+		};
 		E6438D9AF8EDEFEDCB087B38 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				A3A3D0B1EB522C9975F71DA8 /* TopManager.app */,
+				0F5A69E0EE7FDD44157911D7 /* TopManagerTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -203,6 +226,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		D28E798AA7BEAA0638DFD52E /* TopManagerTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9D898AF16ACAC9453397ADCE /* Build configuration list for PBXNativeTarget "TopManagerTests" */;
+			buildPhases = (
+				692062A41592E988A6547E4C /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				48A04DA713F139236C91459E /* PBXTargetDependency */,
+			);
+			name = TopManagerTests;
+			packageProductDependencies = (
+			);
+			productName = TopManagerTests;
+			productReference = 0F5A69E0EE7FDD44157911D7 /* TopManagerTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		F86DD5615146D759EB0D44EB /* TopManager */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 56829675F6738AEDCFCDEE52 /* Build configuration list for PBXNativeTarget "TopManager" */;
@@ -230,6 +271,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
+					D28E798AA7BEAA0638DFD52E = {
+						DevelopmentTeam = P3663392R2;
+						ProvisioningStyle = Automatic;
+					};
 					F86DD5615146D759EB0D44EB = {
 						DevelopmentTeam = P3663392R2;
 						ProvisioningStyle = Automatic;
@@ -251,6 +296,7 @@
 			projectRoot = "";
 			targets = (
 				F86DD5615146D759EB0D44EB /* TopManager */,
+				D28E798AA7BEAA0638DFD52E /* TopManagerTests */,
 			);
 		};
 /* End PBXProject section */
@@ -268,6 +314,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		692062A41592E988A6547E4C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				49D85FF611927294159C89D1 /* FormattingTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		CF5286324D09B9417D3070C3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -303,6 +357,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		48A04DA713F139236C91459E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F86DD5615146D759EB0D44EB /* TopManager */;
+			targetProxy = B01CE3A16D70795D608951EE /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		00F8AAE6BB8D4ED66312B6CB /* Release */ = {
@@ -390,6 +452,24 @@
 			};
 			name = Debug;
 		};
+		C0DE23B98ECF14373EAC79A6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.topmanager.TopManagerTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TopManager.app/Contents/MacOS/TopManager";
+			};
+			name = Release;
+		};
 		C4D5AD1B7274BBED9D423AC0 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -468,6 +548,24 @@
 			};
 			name = Release;
 		};
+		EABC414CD1181D6B70269064 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.topmanager.TopManagerTests;
+				SDKROOT = macosx;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TopManager.app/Contents/MacOS/TopManager";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -476,6 +574,15 @@
 			buildConfigurations = (
 				C4D5AD1B7274BBED9D423AC0 /* Debug */,
 				00F8AAE6BB8D4ED66312B6CB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		9D898AF16ACAC9453397ADCE /* Build configuration list for PBXNativeTarget "TopManagerTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EABC414CD1181D6B70269064 /* Debug */,
+				C0DE23B98ECF14373EAC79A6 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
