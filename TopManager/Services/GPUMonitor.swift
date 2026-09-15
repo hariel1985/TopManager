@@ -86,14 +86,8 @@ final class GPUMonitor {
     }
 
     private static func getAppleSiliconChipName() -> String? {
-        let matchingDict = IOServiceMatching("IOPlatformExpertDevice")
-        var service: io_service_t = 0
-
-        guard IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &service) == KERN_SUCCESS else {
-            return nil
-        }
-
         let platformExpert = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOPlatformExpertDevice"))
+        guard platformExpert != 0 else { return nil }
         defer { IOObjectRelease(platformExpert) }
 
         if let modelData = IORegistryEntryCreateCFProperty(
@@ -125,6 +119,25 @@ final class GPUMonitor {
         }
     }
 
+    /// Walks an `io_iterator_t` and returns the first non-`nil` value `body`
+    /// produces, releasing **every** object it pulled out of the iterator.
+    ///
+    /// The obvious `while` + `defer { release; next() }` shape leaks one
+    /// `io_object_t` whenever the loop is left with `break`/`return`, because
+    /// the deferred `IOIteratorNext` hands back an object nobody releases. At a
+    /// GPU poll every few seconds that leaks tens of thousands of mach port
+    /// rights per day.
+    private static func firstMatch<T>(in iterator: io_iterator_t, _ body: (io_service_t) -> T?) -> T? {
+        var result: T?
+        while result == nil {
+            let service = IOIteratorNext(iterator)
+            guard service != 0 else { break }
+            result = body(service)
+            IOObjectRelease(service)
+        }
+        return result
+    }
+
     private func fetchAppleSiliconGPUInfo() -> GPUInfo? {
         // Apple Silicon uses unified memory - get memory pressure instead
         let totalMemory = ProcessInfo.processInfo.physicalMemory
@@ -139,38 +152,31 @@ final class GPUMonitor {
         if IOServiceGetMatchingServices(kIOMainPortDefault, matchingDict, &iterator) == KERN_SUCCESS {
             defer { IOObjectRelease(iterator) }
 
-            var service = IOIteratorNext(iterator)
-            while service != 0 {
-                defer {
-                    IOObjectRelease(service)
-                    service = IOIteratorNext(iterator)
-                }
-
-                if let props = IORegistryEntryCreateCFProperty(
+            _ = Self.firstMatch(in: iterator) { service -> Bool? in
+                guard let props = IORegistryEntryCreateCFProperty(
                     service,
                     "PerformanceStatistics" as CFString,
                     kCFAllocatorDefault,
                     0
-                )?.takeRetainedValue() as? [String: Any] {
+                )?.takeRetainedValue() as? [String: Any] else { return nil }
 
-                    // Try various keys for GPU memory on Apple Silicon
-                    if let inUse = props["In use system memory"] as? UInt64 {
-                        inUseSystemMemory = inUse
-                    } else if let inUse = props["Alloc system memory"] as? UInt64 {
-                        inUseSystemMemory = inUse
-                    } else if let inUse = props["inUseSystemMemory"] as? UInt64 {
-                        inUseSystemMemory = inUse
-                    }
-
-                    // GPU utilization
-                    if let util = props["Device Utilization %"] as? Int {
-                        utilizationPercent = Double(util)
-                    } else if let util = props["GPU Activity(%)"] as? Int {
-                        utilizationPercent = Double(util)
-                    }
-
-                    break
+                // Try various keys for GPU memory on Apple Silicon
+                if let inUse = props["In use system memory"] as? UInt64 {
+                    inUseSystemMemory = inUse
+                } else if let inUse = props["Alloc system memory"] as? UInt64 {
+                    inUseSystemMemory = inUse
+                } else if let inUse = props["inUseSystemMemory"] as? UInt64 {
+                    inUseSystemMemory = inUse
                 }
+
+                // GPU utilization
+                if let util = props["Device Utilization %"] as? Int {
+                    utilizationPercent = Double(util)
+                } else if let util = props["GPU Activity(%)"] as? Int {
+                    utilizationPercent = Double(util)
+                }
+
+                return true
             }
         }
 
@@ -194,13 +200,7 @@ final class GPUMonitor {
         }
         defer { IOObjectRelease(iterator) }
 
-        var service = IOIteratorNext(iterator)
-        while service != 0 {
-            defer {
-                IOObjectRelease(service)
-                service = IOIteratorNext(iterator)
-            }
-
+        return Self.firstMatch(in: iterator) { service -> GPUInfo? in
             var name = "GPU"
             if let modelData = IORegistryEntryCreateCFProperty(
                 service,
@@ -246,8 +246,8 @@ final class GPUMonitor {
                     isUnifiedMemory: false
                 )
             }
-        }
 
-        return nil
+            return nil
+        }
     }
 }

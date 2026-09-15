@@ -1,20 +1,26 @@
 import SwiftUI
 
+/// Settings window shell. Like `ContentView`, it deliberately observes nothing:
+/// a body containing `.tabItem` leaks its `AnyView(Label(…))` on every
+/// re-evaluation, and dragging a threshold slider re-publishes `AppSettings`
+/// on every step. The tabs below own the observation instead.
 struct SettingsView: View {
-    @EnvironmentObject var settings: AppSettings
-
     var body: some View {
         TabView {
-            generalTab
+            GeneralSettingsTab()
                 .tabItem { Label("General", systemImage: "gearshape") }
-            alertsTab
+            AlertSettingsTab()
                 .tabItem { Label("Alerts", systemImage: "bell") }
         }
         .frame(width: 440, height: 340)
         .padding()
     }
+}
 
-    private var generalTab: some View {
+private struct GeneralSettingsTab: View {
+    @EnvironmentObject var settings: AppSettings
+
+    var body: some View {
         Form {
             Section {
                 Toggle("Launch at login", isOn: $settings.launchAtLogin)
@@ -41,8 +47,12 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
     }
+}
 
-    private var alertsTab: some View {
+private struct AlertSettingsTab: View {
+    @EnvironmentObject var settings: AppSettings
+
+    var body: some View {
         Form {
             Section {
                 Toggle("Enable notifications", isOn: $settings.notificationsEnabled)

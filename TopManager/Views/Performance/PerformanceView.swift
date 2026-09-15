@@ -1,28 +1,26 @@
 import SwiftUI
 import Charts
 
+/// Sub-tab shell for the Performance tab. The selection is left to SwiftUI on
+/// purpose: an explicit `@State` binding would re-evaluate this body — and so
+/// leak its `.tabItem` labels — on every tab switch. See `ContentView`.
 struct PerformanceView: View {
-    @State private var selectedTab = 0
-
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView {
             CPUTabView()
                 .tabItem {
                     Label("CPU", systemImage: "cpu")
                 }
-                .tag(0)
 
             MemoryTabView()
                 .tabItem {
                     Label("Memory", systemImage: "memorychip")
                 }
-                .tag(1)
 
             NetworkTabView()
                 .tabItem {
                     Label("Network", systemImage: "network")
                 }
-                .tag(2)
         }
     }
 }

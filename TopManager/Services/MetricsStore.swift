@@ -107,10 +107,16 @@ final class MetricsStore {
     private var unsaved = 0
     private let ioQueue = DispatchQueue(label: "com.topmanager.metricsstore.io", qos: .utility)
 
+    /// - Note: `saveEvery` is deliberately coarse. Every save re-encodes the
+    ///   *whole* history (up to `maxCount` samples), which costs a few hundred
+    ///   thousand transient allocations; at the old cadence of 10 that ran twice
+    ///   a minute and kept the malloc small zone needlessly dirty. 40 samples is
+    ///   ~2 minutes at the default 3 s refresh, and `flush()` still runs on quit
+    ///   and when the app goes to the background.
     init(fileURL: URL? = nil,
          maxAge: TimeInterval = 24 * 60 * 60,
          maxCount: Int = 20_000,
-         saveEvery: Int = 10) {
+         saveEvery: Int = 40) {
         self.fileURL = fileURL ?? Self.defaultFileURL()
         self.maxAge = maxAge
         self.maxCount = maxCount
