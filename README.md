@@ -9,7 +9,7 @@ A native macOS system monitor application built with SwiftUI. TopManager provide
 
 ## Download
 
-**[⬇️ Download TopManager 1.0 (.dmg)](https://github.com/hariel1985/TopManager/releases/latest)**
+**[⬇️ Download TopManager 1.1 (.dmg)](https://github.com/hariel1985/TopManager/releases/latest)**
 
 Signed with a Developer ID and **notarized by Apple** — it opens without Gatekeeper
 warnings. Open the DMG and drag TopManager to your Applications folder.
