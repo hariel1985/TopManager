@@ -8,7 +8,9 @@ struct ProcessItem: Identifiable, Hashable {
     let user: String
     let cpuUsage: Double        // Per-core: 100% = 1 core fully utilized
     let cpuUsageTotal: Double   // Normalized: 100% = all cores fully utilized
-    let memoryUsage: Int64
+    let memoryUsage: Int64      // physical footprint (Activity Monitor's "Memory")
+    let residentMemory: Int64   // pages currently in physical RAM, shared ones included
+    let compressedMemory: Int64 // original size of pages in the compressor — in RAM or swapped out
     let threadCount: Int32
     let state: ProcessState
     let icon: NSImage?
@@ -42,7 +44,9 @@ struct ProcessItem: Identifiable, Hashable {
         diskReadBytes: UInt64 = 0,
         diskWriteBytes: UInt64 = 0,
         energyImpact: Double = 0,
-        executablePath: String? = nil
+        executablePath: String? = nil,
+        residentMemory: Int64 = 0,
+        compressedMemory: Int64 = 0
     ) {
         self.id = pid
         self.pid = pid
@@ -51,6 +55,8 @@ struct ProcessItem: Identifiable, Hashable {
         self.cpuUsage = cpuUsage
         self.cpuUsageTotal = cpuUsageTotal
         self.memoryUsage = memoryUsage
+        self.residentMemory = residentMemory
+        self.compressedMemory = compressedMemory
         self.threadCount = threadCount
         self.state = state
         self.icon = icon
@@ -73,6 +79,8 @@ struct ProcessItem: Identifiable, Hashable {
         lhs.cpuUsage == rhs.cpuUsage &&
         lhs.cpuUsageTotal == rhs.cpuUsageTotal &&
         lhs.memoryUsage == rhs.memoryUsage &&
+        lhs.residentMemory == rhs.residentMemory &&
+        lhs.compressedMemory == rhs.compressedMemory &&
         lhs.threadCount == rhs.threadCount &&
         lhs.state == rhs.state &&
         lhs.diskReadRate == rhs.diskReadRate &&

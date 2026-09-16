@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum ProcessSortColumn: String {
-    case name, pid, cpu, cpuTotal, memory, threads, user, state, energy, disk
+    case name, pid, cpu, cpuTotal, memory, resident, compressed, threads, user, state, energy, disk
 }
 
 struct ProcessView: View {
@@ -60,6 +60,10 @@ struct ProcessView: View {
                 comparison = lhs.cpuUsageTotal < rhs.cpuUsageTotal ? .orderedAscending : (lhs.cpuUsageTotal > rhs.cpuUsageTotal ? .orderedDescending : .orderedSame)
             case .memory:
                 comparison = lhs.memoryUsage < rhs.memoryUsage ? .orderedAscending : (lhs.memoryUsage > rhs.memoryUsage ? .orderedDescending : .orderedSame)
+            case .resident:
+                comparison = lhs.residentMemory < rhs.residentMemory ? .orderedAscending : (lhs.residentMemory > rhs.residentMemory ? .orderedDescending : .orderedSame)
+            case .compressed:
+                comparison = lhs.compressedMemory < rhs.compressedMemory ? .orderedAscending : (lhs.compressedMemory > rhs.compressedMemory ? .orderedDescending : .orderedSame)
             case .threads:
                 comparison = lhs.threadCount < rhs.threadCount ? .orderedAscending : (lhs.threadCount > rhs.threadCount ? .orderedDescending : .orderedSame)
             case .user:
@@ -85,6 +89,34 @@ struct ProcessView: View {
     var selectedProcessItem: ProcessItem? {
         guard let pid = selectedProcess.first else { return nil }
         return monitor.processes.first { $0.pid == pid }
+    }
+
+    /// Memory, RAM and Compressed as a single builder element: Table accepts at
+    /// most 10 columns per block, and inlining them also exceeds the type
+    /// checker's time limit for the table expression.
+    @TableColumnBuilder<ProcessItem, KeyPathComparator<ProcessItem>>
+    private var memoryColumns: some TableColumnContent<ProcessItem, KeyPathComparator<ProcessItem>> {
+        TableColumn("Memory", value: \.memoryUsage) { process in
+            Text(formatBytes(process.memoryUsage))
+                .monospacedDigit()
+        }
+        .width(80)
+
+        TableColumn("RAM", value: \.residentMemory) { process in
+            Text(formatBytes(process.residentMemory))
+                .monospacedDigit()
+        }
+        .width(80)
+
+        TableColumn("Compressed", value: \.compressedMemory) { process in
+            if process.compressedMemory > 0 {
+                Text(formatBytes(process.compressedMemory))
+                    .monospacedDigit()
+            } else {
+                Text("—").foregroundColor(.secondary)
+            }
+        }
+        .width(85)
     }
 
     var body: some View {
@@ -140,11 +172,7 @@ struct ProcessView: View {
                 }
                 .width(60)
 
-                TableColumn("Memory", value: \.memoryUsage) { process in
-                    Text(formatBytes(process.memoryUsage))
-                        .monospacedDigit()
-                }
-                .width(80)
+                memoryColumns
 
                 TableColumn("Disk I/O", value: \.diskTotalRate) { process in
                     if process.diskTotalRate > 0 {
@@ -246,6 +274,10 @@ struct ProcessView: View {
                 sortColumn = .energy
             } else if keyPathString.contains("diskTotalRate") {
                 sortColumn = .disk
+            } else if keyPathString.contains("residentMemory") {
+                sortColumn = .resident
+            } else if keyPathString.contains("compressedMemory") {
+                sortColumn = .compressed
             } else if keyPathString.contains("memoryUsage") {
                 sortColumn = .memory
             } else if keyPathString.contains("name") {

@@ -106,6 +106,8 @@ final class ProcessMonitor {
                 )
                 detail = DetailedSample(
                     memory: rusageData.memory,
+                    resident: rusageData.resident,
+                    compressed: fetchCompressedMemory(pid: pid) ?? 0,
                     threads: taskInfo.pti_threadnum,
                     cpu: cpu,
                     diskReadRate: extra.readRate,
@@ -153,7 +155,9 @@ final class ProcessMonitor {
             diskReadBytes: detail.diskReadBytes,
             diskWriteBytes: detail.diskWriteBytes,
             energyImpact: detail.energy,
-            executablePath: pathCache[pid]
+            executablePath: pathCache[pid],
+            residentMemory: detail.resident,
+            compressedMemory: detail.compressed
         )
     }
 
@@ -234,6 +238,8 @@ final class ProcessMonitor {
     /// The expensive per-process readings (rusage + task info + derived rates).
     private struct DetailedSample {
         var memory: Int64
+        var resident: Int64
+        var compressed: Int64
         var threads: Int32
         var cpu: Double
         var diskReadRate: Double
@@ -242,12 +248,14 @@ final class ProcessMonitor {
         var diskWriteBytes: UInt64
         var energy: Double
 
-        static let zero = DetailedSample(memory: 0, threads: 0, cpu: 0, diskReadRate: 0, diskWriteRate: 0,
+        static let zero = DetailedSample(memory: 0, resident: 0, compressed: 0, threads: 0, cpu: 0,
+                                         diskReadRate: 0, diskWriteRate: 0,
                                          diskReadBytes: 0, diskWriteBytes: 0, energy: 0)
     }
 
     private struct RusageData {
         var memory: Int64 = 0
+        var resident: Int64 = 0
         var userTime: UInt64 = 0
         var systemTime: UInt64 = 0
         var diskRead: UInt64 = 0
@@ -266,6 +274,7 @@ final class ProcessMonitor {
         if result == 0 {
             return RusageData(
                 memory: Int64(rusage.ri_phys_footprint),
+                resident: Int64(rusage.ri_resident_size),
                 userTime: rusage.ri_user_time,
                 systemTime: rusage.ri_system_time,
                 diskRead: rusage.ri_diskio_bytesread,
@@ -280,6 +289,7 @@ final class ProcessMonitor {
         if proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &taskInfo, taskInfoSize) == taskInfoSize {
             return RusageData(
                 memory: Int64(taskInfo.pti_resident_size),
+                resident: Int64(taskInfo.pti_resident_size),
                 userTime: taskInfo.pti_total_user,
                 systemTime: taskInfo.pti_total_system
             )
@@ -489,6 +499,29 @@ func fetchProcessArguments(pid: pid_t) -> [String] {
     guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0 else { return [] }
     // sysctl may shrink `size`; only parse what was actually written.
     return ProcArgs.parse(Array(buffer.prefix(size)))?.args ?? []
+}
+
+/// Memory of a process currently held by the compressor, at its original
+/// (uncompressed) size. macOS does not track swap per process: when compressor
+/// segments are paged out to disk they stay counted here, so this is the
+/// closest per-process "swapped" figure that exists — Activity Monitor's
+/// "Compressed Memory" and `top`'s CMPRS show the same value.
+///
+/// Needs only a task *name* port, which the kernel hands out for processes of
+/// the same user; returns `nil` for other users' and system processes.
+func fetchCompressedMemory(pid: pid_t) -> Int64? {
+    var port: mach_port_name_t = 0
+    guard task_name_for_pid(mach_task_self_, pid, &port) == KERN_SUCCESS else { return nil }
+    defer { mach_port_deallocate(mach_task_self_, port) }
+
+    var info = task_vm_info_data_t()
+    var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.stride / MemoryLayout<natural_t>.stride)
+    let result = withUnsafeMutablePointer(to: &info) {
+        $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+            task_info(port, task_flavor_t(TASK_VM_INFO), $0, &count)
+        }
+    }
+    return result == KERN_SUCCESS ? Int64(info.compressed) : nil
 }
 
 /// Counts open file descriptors for a process (files, sockets, pipes, …).

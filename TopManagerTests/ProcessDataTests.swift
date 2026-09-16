@@ -107,6 +107,22 @@ final class ProcessDataTests: XCTestCase {
             let zero = own.filter { $0.memoryUsage == 0 }.count
             XCTAssertLessThan(zero, max(3, own.count / 10),
                               "fetch \(fetch): \(zero) of \(own.count) own processes reported 0 memory")
+            let zeroRAM = own.filter { $0.residentMemory == 0 }.count
+            XCTAssertLessThan(zeroRAM, max(3, own.count / 10),
+                              "fetch \(fetch): \(zeroRAM) of \(own.count) own processes reported 0 RAM")
         }
+    }
+
+    func testOwnProcessReportsResidentMemory() {
+        let item = ProcessMonitor().fetchProcesses().first { $0.pid == getpid() }
+        XCTAssertNotNil(item)
+        XCTAssertGreaterThan(item?.residentMemory ?? 0, 0)
+        XCTAssertGreaterThan(item?.memoryUsage ?? 0, 0)
+    }
+
+    /// A task name port is granted for our own processes only; launchd runs as root.
+    func testCompressedMemoryReadableForOwnProcessesOnly() {
+        XCTAssertNotNil(fetchCompressedMemory(pid: getpid()))
+        XCTAssertNil(fetchCompressedMemory(pid: 1))
     }
 }

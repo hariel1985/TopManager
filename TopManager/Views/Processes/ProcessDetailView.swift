@@ -76,6 +76,8 @@ struct ProcessInspectorSheet: View {
             DetailRow(label: "CPU (total)", value: String(format: "%.2f%%", process.cpuUsageTotal))
             DetailRow(label: "Energy", value: String(format: "%.1f", process.energyImpact))
             DetailRow(label: "Memory", value: formatBytes(process.memoryUsage))
+            DetailRow(label: "RAM", value: formatBytes(process.residentMemory))
+            DetailRow(label: "Compressed", value: process.compressedMemory > 0 ? formatBytes(process.compressedMemory) : "—")
             DetailRow(label: "Threads", value: "\(process.threadCount)")
             DetailRow(label: "Open files", value: openFiles.map(String.init) ?? "…")
             DetailRow(label: "Disk read/s", value: process.diskReadRate > 0 ? formatBytesPerSecond(process.diskReadRate) : "—")
