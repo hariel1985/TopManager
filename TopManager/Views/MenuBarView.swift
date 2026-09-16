@@ -1,21 +1,23 @@
 import SwiftUI
 
 /// The compact menu-bar title. Renders whichever metric the user picked.
+/// Reads `MenuBarStatus`, not `SystemMonitor`, so it keeps updating while the
+/// monitor's view publishing is paused.
 struct MenuBarLabel: View {
-    @ObservedObject var monitor: SystemMonitor
+    @ObservedObject var status: MenuBarStatus
     @ObservedObject var settings: AppSettings
     @ObservedObject var alerts: AlertCenter
 
     var body: some View {
         switch settings.menuBarMetric {
         case .cpu:
-            textOrIcon(monitor.cpuInfo.map { String(format: "%.0f%%", $0.globalUsage) }, icon: "cpu")
+            textOrIcon(status.cpuText, icon: "cpu")
         case .memory:
-            textOrIcon(monitor.memoryInfo.map { String(format: "%.0f%%", $0.usagePercentage) }, icon: "memorychip")
+            textOrIcon(status.memoryText, icon: "memorychip")
         case .health:
             Text("♥ \(alerts.healthScore)").monospacedDigit()
         case .download:
-            textOrIcon(monitor.networkInfo.map { formatBytesPerSecond($0.totalDownloadRate) }, icon: "arrow.down")
+            textOrIcon(status.downloadText, icon: "arrow.down")
         }
     }
 

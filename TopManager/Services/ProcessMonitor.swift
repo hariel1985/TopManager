@@ -6,6 +6,7 @@ final class ProcessMonitor {
     private var previousCPUTimes: [pid_t: (user: UInt64, system: UInt64, timestamp: Date)] = [:]
     private var previousDiskIO: [pid_t: (read: UInt64, write: UInt64, idle: UInt64, timestamp: Date)] = [:]
     private var lastKnownCPU: [pid_t: Double] = [:]  // Cache last known CPU usage
+    private var lastDetailed: [pid_t: DetailedSample] = [:]  // Reused on lightweight refreshes
     private let iconCache = NSCache<NSNumber, NSImage>()
     private var noIconPids: Set<pid_t> = []  // Cache for PIDs with no icon
     private var nameCache: [pid_t: String] = [:]
@@ -56,6 +57,7 @@ final class ProcessMonitor {
             previousDiskIO.removeValue(forKey: pid)
             noIconPids.remove(pid)
             lastKnownCPU.removeValue(forKey: pid)
+            lastDetailed.removeValue(forKey: pid)
         }
 
         return processes
@@ -81,14 +83,7 @@ final class ProcessMonitor {
         let lastCPU = lastKnownCPU[pid] ?? 0
         let needsDetailedInfo = fullRefresh || lastCPU > 0.1
 
-        let memoryUsage: Int64
-        let threadCount: Int32
-        let cpuUsage: Double
-        var diskReadRate: Double = 0
-        var diskWriteRate: Double = 0
-        var diskReadBytes: UInt64 = 0
-        var diskWriteBytes: UInt64 = 0
-        var energyImpact: Double = 0
+        let detail: DetailedSample
 
         if needsDetailedInfo {
             var taskInfo = proc_taskinfo()
@@ -98,9 +93,7 @@ final class ProcessMonitor {
 
             if hasTaskInfo {
                 let rusageData = fetchRusageData(pid: pid)
-                memoryUsage = rusageData.memory
-                threadCount = taskInfo.pti_threadnum
-                cpuUsage = calculateCPUUsage(
+                let cpu = calculateCPUUsage(
                     pid: pid,
                     userTime: rusageData.userTime,
                     systemTime: rusageData.systemTime
@@ -111,22 +104,30 @@ final class ProcessMonitor {
                     diskWrite: rusageData.diskWrite,
                     idleWakeups: rusageData.idleWakeups
                 )
-                diskReadRate = extra.readRate
-                diskWriteRate = extra.writeRate
-                diskReadBytes = rusageData.diskRead
-                diskWriteBytes = rusageData.diskWrite
-                energyImpact = EnergyModel.impact(cpuPercent: cpuUsage, idleWakeupsPerSec: extra.idleWakeupsPerSec)
+                detail = DetailedSample(
+                    memory: rusageData.memory,
+                    threads: taskInfo.pti_threadnum,
+                    cpu: cpu,
+                    diskReadRate: extra.readRate,
+                    diskWriteRate: extra.writeRate,
+                    diskReadBytes: rusageData.diskRead,
+                    diskWriteBytes: rusageData.diskWrite,
+                    energy: EnergyModel.impact(cpuPercent: cpu, idleWakeupsPerSec: extra.idleWakeupsPerSec)
+                )
+                lastDetailed[pid] = detail
             } else {
-                memoryUsage = 0
-                threadCount = 0
-                cpuUsage = 0
+                detail = .zero
             }
         } else {
-            // Lightweight refresh - reuse last known values
-            memoryUsage = 0
-            threadCount = 0
-            cpuUsage = 0
+            // Lightweight refresh - reuse last known values. This used to emit
+            // zeros, so ~90% of rows showed "Zero KB" memory (and 0 threads/CPU)
+            // on two of every three updates.
+            detail = lastDetailed[pid] ?? .zero
         }
+
+        let memoryUsage = detail.memory
+        let threadCount = detail.threads
+        let cpuUsage = detail.cpu
 
         let state = determineProcessState(status: bsdInfo.pbi_status, cpuUsage: cpuUsage)
 
@@ -147,11 +148,11 @@ final class ProcessMonitor {
             icon: icon,
             parentPid: parentPid,
             startTime: startTime,
-            diskReadRate: diskReadRate,
-            diskWriteRate: diskWriteRate,
-            diskReadBytes: diskReadBytes,
-            diskWriteBytes: diskWriteBytes,
-            energyImpact: energyImpact,
+            diskReadRate: detail.diskReadRate,
+            diskWriteRate: detail.diskWriteRate,
+            diskReadBytes: detail.diskReadBytes,
+            diskWriteBytes: detail.diskWriteBytes,
+            energyImpact: detail.energy,
             executablePath: pathCache[pid]
         )
     }
@@ -228,6 +229,21 @@ final class ProcessMonitor {
 
         userCache[uid] = name
         return name
+    }
+
+    /// The expensive per-process readings (rusage + task info + derived rates).
+    private struct DetailedSample {
+        var memory: Int64
+        var threads: Int32
+        var cpu: Double
+        var diskReadRate: Double
+        var diskWriteRate: Double
+        var diskReadBytes: UInt64
+        var diskWriteBytes: UInt64
+        var energy: Double
+
+        static let zero = DetailedSample(memory: 0, threads: 0, cpu: 0, diskReadRate: 0, diskWriteRate: 0,
+                                         diskReadBytes: 0, diskWriteBytes: 0, energy: 0)
     }
 
     private struct RusageData {

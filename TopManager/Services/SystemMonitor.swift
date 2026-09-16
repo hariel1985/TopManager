@@ -6,7 +6,8 @@ final class SystemMonitor: ObservableObject {
 
     private let backgroundQueue = DispatchQueue(label: "com.topmanager.monitor", qos: .userInitiated)
 
-    // Published properties (must be updated on main thread)
+    // Published properties (must be updated on main thread). They only follow
+    // `live` while a TopManager window is on screen — see `setUIVisible`.
     @MainActor @Published var cpuInfo: CPUInfo?
     @MainActor @Published var memoryInfo: MemoryInfo?
     @MainActor @Published var processes: [ProcessItem] = []
@@ -21,6 +22,24 @@ final class SystemMonitor: ObservableObject {
     @MainActor @Published var coreHistories: [Int: [CoreHistoryPoint]] = [:]
     @MainActor @Published var memoryHistory: [MemoryHistoryPoint] = []
     @MainActor @Published var networkHistory: [NetworkHistoryPoint] = []
+
+    /// Always-current readings and chart histories. Recording, alerts and the
+    /// menu-bar title read from here, so they keep running while views are paused.
+    private struct LiveState {
+        var cpuInfo: CPUInfo?
+        var memoryInfo: MemoryInfo?
+        var processes: [ProcessItem] = []
+        var diskInfo: DiskInfo?
+        var networkInfo: NetworkInfo?
+        var gpuInfo: GPUInfo?
+        var powerInfo: PowerInfo?
+        var cpuHistory: [CPUHistoryPoint] = []
+        var coreHistories: [Int: [CoreHistoryPoint]] = [:]
+        var memoryHistory: [MemoryHistoryPoint] = []
+        var networkHistory: [NetworkHistoryPoint] = []
+    }
+    @MainActor private var live = LiveState()
+    @MainActor private var isUIVisible = true
 
     // Sub-monitors
     private let cpuMonitor = CPUMonitor()
@@ -47,6 +66,8 @@ final class SystemMonitor: ObservableObject {
     private init() {}
 
     @MainActor func startMonitoring() {
+        guard timer == nil else { return }
+
         // Immediate initial fetch
         backgroundQueue.async { [weak self] in
             guard let self = self else { return }
@@ -134,93 +155,101 @@ final class SystemMonitor: ObservableObject {
                                       processes: [ProcessItem]?, disk: DiskInfo?, gpu: GPUInfo?,
                                       power: PowerInfo?) {
         if let info = cpu {
-            cpuInfo = info
-            let historyPoint = CPUHistoryPoint(
+            live.cpuInfo = info
+            live.cpuHistory.append(CPUHistoryPoint(
                 timestamp: info.timestamp,
                 usage: info.globalUsage,
                 userUsage: info.userUsage,
                 systemUsage: info.systemUsage
-            )
-            cpuHistory.append(historyPoint)
-            if cpuHistory.count > historyLimit {
-                cpuHistory.removeFirst()
+            ))
+            if live.cpuHistory.count > historyLimit {
+                live.cpuHistory.removeFirst()
             }
 
             for core in info.coreUsages {
-                let corePoint = CoreHistoryPoint(timestamp: info.timestamp, usage: core.usage)
-                if coreHistories[core.id] == nil {
-                    coreHistories[core.id] = []
-                }
-                coreHistories[core.id]?.append(corePoint)
-                if coreHistories[core.id]?.count ?? 0 > historyLimit {
-                    coreHistories[core.id]?.removeFirst()
+                live.coreHistories[core.id, default: []].append(
+                    CoreHistoryPoint(timestamp: info.timestamp, usage: core.usage))
+                if live.coreHistories[core.id, default: []].count > historyLimit {
+                    live.coreHistories[core.id]?.removeFirst()
                 }
             }
         }
 
         if let info = memory {
-            memoryInfo = info
-            let historyPoint = MemoryHistoryPoint(
+            live.memoryInfo = info
+            live.memoryHistory.append(MemoryHistoryPoint(
                 timestamp: info.timestamp,
                 usedMemory: info.usedMemory,
                 totalMemory: info.totalMemory
-            )
-            memoryHistory.append(historyPoint)
-            if memoryHistory.count > historyLimit {
-                memoryHistory.removeFirst()
+            ))
+            if live.memoryHistory.count > historyLimit {
+                live.memoryHistory.removeFirst()
             }
         }
 
         if let info = network {
-            networkInfo = info
-            let historyPoint = NetworkHistoryPoint(
+            live.networkInfo = info
+            live.networkHistory.append(NetworkHistoryPoint(
                 timestamp: info.timestamp,
                 downloadRate: info.totalDownloadRate,
                 uploadRate: info.totalUploadRate
-            )
-            networkHistory.append(historyPoint)
-            if networkHistory.count > historyLimit {
-                networkHistory.removeFirst()
+            ))
+            if live.networkHistory.count > historyLimit {
+                live.networkHistory.removeFirst()
             }
         }
 
-        if let procs = processes {
-            self.processes = procs
-        }
+        if let procs = processes { live.processes = procs }
+        if let info = disk { live.diskInfo = info }
+        if let info = gpu { live.gpuInfo = info }
+        if let info = power { live.powerInfo = info }
 
-        if let info = disk {
-            diskInfo = info
-        }
-
-        if let info = gpu {
-            gpuInfo = info
-        }
-
-        if let info = power {
-            powerInfo = info
-        }
+        if isUIVisible { publishLive() }
+        MenuBarStatus.shared.update(cpu: live.cpuInfo, memory: live.memoryInfo, network: live.networkInfo)
 
         // Persist a system-wide sample so history survives restarts and long ranges.
-        if let c = cpuInfo, let m = memoryInfo {
+        if let c = live.cpuInfo, let m = live.memoryInfo {
             MetricsStore.shared.record(MetricsSample(
                 t: c.timestamp,
                 cpu: c.globalUsage,
                 memUsed: m.usedMemory,
                 memTotal: m.totalMemory,
-                netDown: networkInfo?.totalDownloadRate ?? 0,
-                netUp: networkInfo?.totalUploadRate ?? 0
+                netDown: live.networkInfo?.totalDownloadRate ?? 0,
+                netUp: live.networkInfo?.totalUploadRate ?? 0
             ))
         }
 
         // Proactive health + alert evaluation (runs every cycle).
         AlertCenter.shared.evaluate(
-            cpuUsage: cpuInfo?.globalUsage ?? 0,
-            memory: memoryInfo,
-            disk: diskInfo,
+            cpuUsage: live.cpuInfo?.globalUsage ?? 0,
+            memory: live.memoryInfo,
+            disk: live.diskInfo,
             thermal: currentThermalLevel(),
-            topProcess: self.processes.max { $0.cpuUsage < $1.cpuUsage },
-            power: powerInfo
+            topProcess: live.processes.max { $0.cpuUsage < $1.cpuUsage },
+            power: live.powerInfo
         )
+    }
+
+    /// Pause (`false`) or resume (`true`) publishing to views. Resuming catches
+    /// the views up at once with everything recorded while they were hidden.
+    @MainActor func setUIVisible(_ visible: Bool) {
+        guard visible != isUIVisible else { return }
+        isUIVisible = visible
+        if visible { publishLive() }
+    }
+
+    @MainActor private func publishLive() {
+        cpuInfo = live.cpuInfo
+        memoryInfo = live.memoryInfo
+        processes = live.processes
+        diskInfo = live.diskInfo
+        networkInfo = live.networkInfo
+        gpuInfo = live.gpuInfo
+        powerInfo = live.powerInfo
+        cpuHistory = live.cpuHistory
+        coreHistories = live.coreHistories
+        memoryHistory = live.memoryHistory
+        networkHistory = live.networkHistory
     }
 
     private func currentThermalLevel() -> ThermalLevel {

@@ -48,8 +48,12 @@ final class AlertCenter: ObservableObject {
             thermal: thermal,
             diskUsedFraction: diskFraction
         )
-        healthScore = HealthModel.score(input)
-        diagnosis = HealthModel.diagnosis(input)
+        // Assign only on change: @Published fires on every set, and re-assigning
+        // equal values each tick re-rendered every health view on every refresh.
+        let score = HealthModel.score(input)
+        if score != healthScore { healthScore = score }
+        let findings = HealthModel.diagnosis(input)
+        if findings != diagnosis { diagnosis = findings }
 
         // CPU (sustained)
         let cpuEval = AlertEvaluator.sustained(breached: cpuUsage >= thresholds.cpuPercent,

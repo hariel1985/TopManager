@@ -7,6 +7,16 @@ import UserNotifications
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         UNUserNotificationCenter.current().delegate = self
+
+        // Start here rather than in the main window's onAppear: the app can launch
+        // with no window at all (state restoration after the window was closed),
+        // and the menu bar, alerts and history must run regardless.
+        Task { @MainActor in
+            SystemMonitor.shared.startMonitoring()
+            AppSettings.shared.applyAll()
+            AlertCenter.shared.requestNotificationAuthorization()
+            WindowVisibility.shared.start { SystemMonitor.shared.setUIVisible($0) }
+        }
     }
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,
@@ -33,11 +43,6 @@ struct TopManagerApp: App {
                 .environmentObject(monitor)
                 .environmentObject(AlertCenter.shared)
                 .environmentObject(settings)
-                .onAppear {
-                    monitor.startMonitoring()
-                    settings.applyAll()
-                    AlertCenter.shared.requestNotificationAuthorization()
-                }
         }
         .windowStyle(.automatic)
         .defaultSize(width: 1000, height: 700)
@@ -62,7 +67,7 @@ struct TopManagerApp: App {
                 .environmentObject(AlertCenter.shared)
                 .environmentObject(settings)
         } label: {
-            MenuBarLabel(monitor: monitor, settings: settings, alerts: AlertCenter.shared)
+            MenuBarLabel(status: MenuBarStatus.shared, settings: settings, alerts: AlertCenter.shared)
         }
         .menuBarExtraStyle(.window)
     }

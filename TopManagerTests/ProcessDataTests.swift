@@ -92,4 +92,21 @@ final class ProcessDataTests: XCTestCase {
         XCTAssertNotEqual(make(energy: 5), make(energy: 9))
         XCTAssertEqual(make(energy: 5), make(energy: 5))
     }
+
+    // MARK: - Live sampling
+
+    /// Fetches 1–3 are full refreshes; 4 and 5 are lightweight ones, which used
+    /// to report 0 memory for every idle process (~90% of rows). Only processes
+    /// spawned between fetches may legitimately have no reading yet.
+    func testLightweightRefreshKeepsLastKnownMemory() {
+        let monitor = ProcessMonitor()
+        let me = NSUserName()
+        for fetch in 1...6 {
+            let own = monitor.fetchProcesses().filter { $0.user == me }
+            XCTAssertFalse(own.isEmpty)
+            let zero = own.filter { $0.memoryUsage == 0 }.count
+            XCTAssertLessThan(zero, max(3, own.count / 10),
+                              "fetch \(fetch): \(zero) of \(own.count) own processes reported 0 memory")
+        }
+    }
 }
