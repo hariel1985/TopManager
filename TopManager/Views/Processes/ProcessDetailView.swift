@@ -28,6 +28,7 @@ struct ProcessInspectorSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     liveStats
+                    memoryExplanation
                     pathSection
                     detailsSection
                 }
@@ -87,6 +88,25 @@ struct ProcessInspectorSheet: View {
             if let start = process.startTime {
                 DetailRow(label: "Started", value: formatDate(start))
             }
+        }
+    }
+
+    /// Plain-language guide to the three memory figures; without it, RAM being
+    /// higher than Memory (normal for any SwiftUI app) looks like a bug.
+    private var memoryExplanation: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("About memory").font(.caption).foregroundColor(.secondary)
+            Group {
+                if process.memoryUsage == 0 && process.residentMemory == 0 {
+                    Text("Memory figures are unavailable for processes owned by another user or the system.")
+                        .foregroundColor(.secondary)
+                }
+                Text("**Memory** — what this process is responsible for: its own modified pages, whether in RAM, compressed or swapped out. This is its real memory cost.")
+                Text("**RAM** — pages physically in RAM right now, including system framework code shared by every app. It can be higher than Memory, because shared pages take up RAM only once.")
+                Text("**Compressed** — the part of Memory that macOS has compressed to save RAM, including pages swapped out to disk, shown at their original size.")
+            }
+            .font(.caption)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
