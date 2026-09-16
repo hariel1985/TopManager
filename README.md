@@ -5,11 +5,11 @@ A native macOS system monitor application built with SwiftUI. TopManager provide
 ![macOS](https://img.shields.io/badge/macOS-13.0+-blue)
 ![Swift](https://img.shields.io/badge/Swift-5.9-orange)
 ![License](https://img.shields.io/badge/License-GPL--3.0-green)
-![Release](https://img.shields.io/badge/release-v1.1.0-brightgreen)
+![Release](https://img.shields.io/badge/release-v1.1.1-brightgreen)
 
 ## Download
 
-**[⬇️ Download TopManager 1.1 (.dmg)](https://github.com/hariel1985/TopManager/releases/latest)**
+**[⬇️ Download TopManager 1.1.1 (.dmg)](https://github.com/hariel1985/TopManager/releases/latest)**
 
 Signed with a Developer ID and **notarized by Apple** — it opens without Gatekeeper
 warnings. Open the DMG and drag TopManager to your Applications folder.
