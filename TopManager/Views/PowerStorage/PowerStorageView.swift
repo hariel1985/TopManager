@@ -37,6 +37,18 @@ struct PowerStorageView: View {
                                 ThermalStateView(state: monitor.thermalState)
                             }
 
+                            if let thermal = monitor.thermalInfo {
+                                HStack {
+                                    Text("CPU Temperature:")
+                                    Spacer()
+                                    Text(String(format: "%.0f °C", thermal.cpuMax))
+                                        .monospacedDigit()
+                                        .foregroundColor(cpuTemperatureColor(thermal.cpuMax))
+                                }
+                                .help(String(format: "Hottest of %d CPU die sensors · average %.0f °C",
+                                             thermal.cpuSensorCount, thermal.cpuAverage))
+                            }
+
                             if let cpu = monitor.cpuInfo {
                                 HStack {
                                     Text("CPU Usage:")
@@ -188,6 +200,15 @@ struct PowerStorageView: View {
                 }
             }
             .padding()
+        }
+    }
+
+    private func cpuTemperatureColor(_ celsius: Double) -> Color {
+        switch ThermalMath.level(cpuCelsius: celsius) {
+        case .nominal: return .primary
+        case .fair: return .yellow
+        case .serious: return .orange
+        case .critical: return .red
         }
     }
 }

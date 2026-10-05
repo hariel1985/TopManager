@@ -15,6 +15,7 @@ final class SystemMonitor: ObservableObject {
     @MainActor @Published var networkInfo: NetworkInfo?
     @MainActor @Published var gpuInfo: GPUInfo?
     @MainActor @Published var powerInfo: PowerInfo?
+    @MainActor @Published var thermalInfo: ThermalInfo?
     @MainActor @Published var lastError: String?
 
     // History for charts
@@ -33,6 +34,7 @@ final class SystemMonitor: ObservableObject {
         var networkInfo: NetworkInfo?
         var gpuInfo: GPUInfo?
         var powerInfo: PowerInfo?
+        var thermalInfo: ThermalInfo?
         var cpuHistory: [CPUHistoryPoint] = []
         var coreHistories: [Int: [CoreHistoryPoint]] = [:]
         var memoryHistory: [MemoryHistoryPoint] = []
@@ -49,6 +51,7 @@ final class SystemMonitor: ObservableObject {
     private let networkMonitor = NetworkMonitor()
     private let gpuMonitor = GPUMonitor()
     private let powerMonitor = PowerMonitor()
+    private let temperatureMonitor = TemperatureMonitor()
 
     // Timer
     private var timer: Timer?
@@ -87,10 +90,12 @@ final class SystemMonitor: ObservableObject {
             let diskData = self.diskMonitor.fetchDiskInfo()
             let gpuData = self.gpuMonitor.fetchGPUInfo()
             let powerData = self.powerMonitor.fetchPowerInfo()
+            let thermalData = self.temperatureMonitor.fetchThermalInfo()
 
             DispatchQueue.main.async {
                 self.updateUI(cpu: cpuData, memory: memData, network: netData,
-                             processes: processData, disk: diskData, gpu: gpuData, power: powerData)
+                             processes: processData, disk: diskData, gpu: gpuData, power: powerData,
+                             thermal: thermalData)
             }
         }
 
@@ -127,6 +132,7 @@ final class SystemMonitor: ObservableObject {
         let cpuData = cpuMonitor.fetchCPUInfo()
         let memData = memoryMonitor.fetchMemoryInfo()
         let netData = networkMonitor.fetchNetworkInfo()
+        let thermalData = temperatureMonitor.fetchThermalInfo()
 
         // Fetch processes: first 3 cycles always, then every other cycle
         var processData: [ProcessItem]? = nil
@@ -147,13 +153,14 @@ final class SystemMonitor: ObservableObject {
         // Update UI on main thread
         DispatchQueue.main.async { [weak self] in
             self?.updateUI(cpu: cpuData, memory: memData, network: netData,
-                          processes: processData, disk: diskData, gpu: gpuData, power: powerData)
+                          processes: processData, disk: diskData, gpu: gpuData, power: powerData,
+                          thermal: thermalData)
         }
     }
 
     @MainActor private func updateUI(cpu: CPUInfo?, memory: MemoryInfo?, network: NetworkInfo?,
                                       processes: [ProcessItem]?, disk: DiskInfo?, gpu: GPUInfo?,
-                                      power: PowerInfo?) {
+                                      power: PowerInfo?, thermal: ThermalInfo?) {
         if let info = cpu {
             live.cpuInfo = info
             live.cpuHistory.append(CPUHistoryPoint(
@@ -203,6 +210,7 @@ final class SystemMonitor: ObservableObject {
         if let info = disk { live.diskInfo = info }
         if let info = gpu { live.gpuInfo = info }
         if let info = power { live.powerInfo = info }
+        if let info = thermal { live.thermalInfo = info }
 
         if isUIVisible { publishLive() }
         MenuBarStatus.shared.update(cpu: live.cpuInfo, memory: live.memoryInfo, network: live.networkInfo)
@@ -246,6 +254,7 @@ final class SystemMonitor: ObservableObject {
         networkInfo = live.networkInfo
         gpuInfo = live.gpuInfo
         powerInfo = live.powerInfo
+        thermalInfo = live.thermalInfo
         cpuHistory = live.cpuHistory
         coreHistories = live.coreHistories
         memoryHistory = live.memoryHistory
