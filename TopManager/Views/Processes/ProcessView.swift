@@ -10,12 +10,6 @@ struct ProcessView: View {
     @State private var selectedProcess: Set<ProcessItem.ID> = []
     @State private var sortColumn: ProcessSortColumn = .cpu
     @State private var sortAscending: Bool = false
-    @State private var displayedProcesses: [ProcessItem] = []
-
-    // Keep sortOrder for Table binding compatibility
-    @State private var sortOrder: [KeyPathComparator<ProcessItem>] = [
-        .init(\.cpuUsage, order: .reverse)
-    ]
 
     // Confirmation dialogs
     @State private var showTerminateConfirm = false
@@ -40,14 +34,23 @@ struct ProcessView: View {
         Self.protectedProcesses.contains(name)
     }
 
-    private func updateDisplayedProcesses() {
-        let filtered = monitor.processes.filter {
-            searchText.isEmpty ||
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-            String($0.pid).contains(searchText)
+    /// The rows on screen, derived from current state on every render. This used
+    /// to be cached in @State and refreshed from `onChange` actions, which can read
+    /// an earlier render's sort and search values — a data refresh right after a
+    /// header click could put the table back into the previous order.
+    private var displayedProcesses: [ProcessItem] {
+        Self.filterAndSort(monitor.processes, search: searchText, by: sortColumn, ascending: sortAscending)
+    }
+
+    static func filterAndSort(_ processes: [ProcessItem], search: String,
+                              by sortColumn: ProcessSortColumn, ascending sortAscending: Bool) -> [ProcessItem] {
+        let filtered = processes.filter {
+            search.isEmpty ||
+            $0.name.localizedCaseInsensitiveContains(search) ||
+            String($0.pid).contains(search)
         }
 
-        displayedProcesses = filtered.sorted { lhs, rhs in
+        return filtered.sorted { lhs, rhs in
             let comparison: ComparisonResult
             switch sortColumn {
             case .name:
@@ -86,213 +89,39 @@ struct ProcessView: View {
         }
     }
 
+    /// Looked up among the rows on screen, so a selection hidden by the search
+    /// filter can't be terminated by accident.
     var selectedProcessItem: ProcessItem? {
         guard let pid = selectedProcess.first else { return nil }
-        return monitor.processes.first { $0.pid == pid }
-    }
-
-    /// Memory, RAM and Compressed as a single builder element: Table accepts at
-    /// most 10 columns per block, and inlining them also exceeds the type
-    /// checker's time limit for the table expression.
-    @TableColumnBuilder<ProcessItem, KeyPathComparator<ProcessItem>>
-    private var memoryColumns: some TableColumnContent<ProcessItem, KeyPathComparator<ProcessItem>> {
-        TableColumn("Memory", value: \.memoryUsage) { process in
-            Text(formatBytes(process.memoryUsage))
-                .monospacedDigit()
-        }
-        .width(80)
-
-        TableColumn("RAM", value: \.residentMemory) { process in
-            Text(formatBytes(process.residentMemory))
-                .monospacedDigit()
-        }
-        .width(80)
-
-        TableColumn("Compressed", value: \.compressedMemory) { process in
-            if process.compressedMemory > 0 {
-                Text(formatBytes(process.compressedMemory))
-                    .monospacedDigit()
-            } else {
-                Text("—").foregroundColor(.secondary)
-            }
-        }
-        .width(85)
+        return displayedProcesses.first { $0.pid == pid }
     }
 
     var body: some View {
+        let rows = displayedProcesses
         VStack(spacing: 0) {
             // Summary bar - separate view to avoid re-rendering table
-            ProcessSummaryBar(processCount: displayedProcesses.count, searchText: $searchText)
+            ProcessSummaryBar(processCount: rows.count, searchText: $searchText)
 
             Divider()
 
-            // Process table
-            Table(displayedProcesses, selection: $selectedProcess, sortOrder: $sortOrder) {
-                TableColumn("Name", value: \.name) { process in
-                    HStack(spacing: 6) {
-                        if let icon = process.icon {
-                            Image(nsImage: icon)
-                                .resizable()
-                                .frame(width: 16, height: 16)
-                        } else {
-                            Image(systemName: "app.dashed")
-                                .frame(width: 16, height: 16)
-                                .foregroundColor(.secondary)
-                        }
-                        Text(process.name)
-                            .lineLimit(1)
-                    }
-                }
-                .width(min: 170, ideal: 220)
-
-                TableColumn("PID", value: \.pid) { process in
-                    Text("\(process.pid)")
-                        .monospacedDigit()
-                }
-                .width(60)
-
-                TableColumn("CPU/Core", value: \.cpuUsage) { process in
-                    Text(String(format: "%.1f%%", process.cpuUsage))
-                        .monospacedDigit()
-                        .foregroundColor(cpuColor(process.cpuUsage))
-                }
-                .width(70)
-
-                TableColumn("CPU/Total", value: \.cpuUsageTotal) { process in
-                    Text(String(format: "%.2f%%", process.cpuUsageTotal))
-                        .monospacedDigit()
-                        .foregroundColor(cpuColorTotal(process.cpuUsageTotal))
-                }
-                .width(70)
-
-                TableColumn("Energy", value: \.energyImpact) { process in
-                    Text(String(format: "%.1f", process.energyImpact))
-                        .monospacedDigit()
-                        .foregroundColor(energyColor(process.energyImpact))
-                }
-                .width(60)
-
-                memoryColumns
-
-                TableColumn("Disk I/O", value: \.diskTotalRate) { process in
-                    if process.diskTotalRate > 0 {
-                        Text(formatBytesPerSecond(process.diskTotalRate))
-                            .monospacedDigit()
-                    } else {
-                        Text("—").foregroundColor(.secondary)
-                    }
-                }
-                .width(90)
-
-                TableColumn("Threads", value: \.threadCount) { process in
-                    Text("\(process.threadCount)")
-                        .monospacedDigit()
-                }
-                .width(60)
-
-                TableColumn("User", value: \.user) { process in
-                    Text(process.user)
-                        .lineLimit(1)
-                }
-                .width(80)
-
-                TableColumn("State", value: \.state.rawValue) { process in
-                    HStack(spacing: 4) {
-                        Image(systemName: process.state.symbol)
-                            .foregroundColor(stateColor(process.state))
-                        Text(process.state.rawValue)
-                    }
-                }
-                .width(90)
-            }
-            .contextMenu(forSelectionType: ProcessItem.ID.self) { selection in
-                if let pid = selection.first,
-                   let process = monitor.processes.first(where: { $0.pid == pid }) {
-                    Button("Get Info (⌘I)") {
-                        inspectorProcess = process
-                    }
-                    Divider()
-                    Button("Terminate (⌫)") {
-                        initiateTerminate()
-                    }
-                    Button("Force Kill (⌘⌫)") {
-                        initiateForceKill()
-                    }
-                    Divider()
-                    Button("Suspend") {
-                        performSuspend(process: process)
-                    }
-                    Button("Resume") {
-                        performResume(process: process)
-                    }
-                    Divider()
-                    Button("Copy PID") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString("\(pid)", forType: .string)
-                    }
-                }
-            } primaryAction: { selection in
-                // Double-click opens the deep-dive inspector
-                if let pid = selection.first,
-                   let process = monitor.processes.first(where: { $0.pid == pid }) {
-                    inspectorProcess = process
-                }
-            }
-            .onDeleteCommand {
-                initiateTerminate()
-            }
-        }
-        .onAppear {
-            updateDisplayedProcesses()
-        }
-        .onChange(of: monitor.processes) { _ in
-            updateDisplayedProcesses()
-        }
-        .onChange(of: searchText) { _ in
-            updateDisplayedProcesses()
-        }
-        .onChange(of: sortColumn) { _ in
-            updateDisplayedProcesses()
-        }
-        .onChange(of: sortAscending) { _ in
-            updateDisplayedProcesses()
-        }
-        .onChange(of: sortOrder) { newOrder in
-            guard let comparator = newOrder.first else { return }
-
-            // Detect which column and direction from the KeyPathComparator
-            let ascending = comparator.order == .forward
-
-            // Use string representation of keypath to determine column
-            let keyPathString = String(describing: comparator)
-
-            if keyPathString.contains("cpuUsageTotal") {
-                sortColumn = .cpuTotal
-            } else if keyPathString.contains("cpuUsage") {
-                sortColumn = .cpu
-            } else if keyPathString.contains("energyImpact") {
-                sortColumn = .energy
-            } else if keyPathString.contains("diskTotalRate") {
-                sortColumn = .disk
-            } else if keyPathString.contains("residentMemory") {
-                sortColumn = .resident
-            } else if keyPathString.contains("compressedMemory") {
-                sortColumn = .compressed
-            } else if keyPathString.contains("memoryUsage") {
-                sortColumn = .memory
-            } else if keyPathString.contains("name") {
-                sortColumn = .name
-            } else if keyPathString.contains("pid") {
-                sortColumn = .pid
-            } else if keyPathString.contains("threadCount") {
-                sortColumn = .threads
-            } else if keyPathString.contains("user") {
-                sortColumn = .user
-            } else if keyPathString.contains("state") {
-                sortColumn = .state
-            }
-
-            sortAscending = ascending
+            ProcessTableView(
+                processes: rows,
+                selection: $selectedProcess,
+                sortColumn: sortColumn,
+                sortAscending: sortAscending,
+                onSort: { column, ascending in
+                    sortColumn = column
+                    sortAscending = ascending
+                },
+                actions: ProcessTableActions(
+                    open: { inspectorProcess = $0 },
+                    terminate: { initiateTerminate($0) },
+                    forceKill: { initiateForceKill($0) },
+                    suspend: { performSuspend(process: $0) },
+                    resume: { performResume(process: $0) },
+                    deleteKey: { initiateTerminate() }
+                )
+            )
         }
         .background(
             KeyboardShortcutHandler(
@@ -344,8 +173,8 @@ struct ProcessView: View {
         }
     }
 
-    private func initiateTerminate() {
-        guard let process = selectedProcessItem else { return }
+    private func initiateTerminate(_ target: ProcessItem? = nil) {
+        guard let process = target ?? selectedProcessItem else { return }
         processToKill = process
 
         if skipTerminateConfirm {
@@ -355,8 +184,8 @@ struct ProcessView: View {
         }
     }
 
-    private func initiateForceKill() {
-        guard let process = selectedProcessItem else { return }
+    private func initiateForceKill(_ target: ProcessItem? = nil) {
+        guard let process = target ?? selectedProcessItem else { return }
 
         // SAFETY: Prevent force-killing critical system processes
         if isProtectedProcess(process.name) {
@@ -399,49 +228,6 @@ struct ProcessView: View {
             errorTitle = "Unable to \(action) \"\(processName)\""
             errorMessage = "\(error.errorDescription ?? "Unknown error")\n\n\(error.recoverySuggestion ?? "")"
             showErrorAlert = true
-        }
-    }
-
-    private func cpuColor(_ usage: Double) -> Color {
-        if usage > 80 {
-            return .red
-        } else if usage > 50 {
-            return .orange
-        } else if usage > 20 {
-            return .yellow
-        }
-        return .primary
-    }
-
-    private func cpuColorTotal(_ usage: Double) -> Color {
-        if usage > 10 {
-            return .red
-        } else if usage > 5 {
-            return .orange
-        } else if usage > 2 {
-            return .yellow
-        }
-        return .primary
-    }
-
-    private func energyColor(_ impact: Double) -> Color {
-        if impact > 50 {
-            return .red
-        } else if impact > 20 {
-            return .orange
-        } else if impact > 8 {
-            return .yellow
-        }
-        return .primary
-    }
-
-    private func stateColor(_ state: ProcessState) -> Color {
-        switch state {
-        case .running: return .green
-        case .sleeping: return .secondary
-        case .stopped: return .orange
-        case .zombie: return .red
-        case .unknown: return .secondary
         }
     }
 }
